@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { useAuthStore } from '../stores/authStore';
 import { useRingtoneStore } from '../stores/ringtoneStore';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
@@ -26,7 +27,6 @@ export const Record = () => {
   } = useAudioRecorder();
 
   const [title, setTitle] = useState('');
-  const [error, setError] = useState<string | null>(null);
 
   const getBlobDuration = async (blob: Blob): Promise<number | null> => {
     try {
@@ -58,12 +58,17 @@ export const Record = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  useEffect(() => {
+    if (recorderError) {
+      toast.error(recorderError);
+    }
+  }, [recorderError]);
+
   const handleStart = async () => {
-    setError(null);
     try {
       await startRecording();
     } catch {
-      setError('Impossible d\'accéder au microphone');
+      toast.error('Impossible d\'accéder au microphone');
     }
   };
 
@@ -73,13 +78,13 @@ export const Record = () => {
 
   const handleSave = async () => {
     if (!title.trim()) {
-      setError('Veuillez entrer un titre');
+      toast.error('Veuillez entrer un titre');
       return;
     }
 
     const audioBlob = getAudioBlob();
     if (!audioBlob) {
-      setError('Aucun enregistrement disponible');
+      toast.error('Aucun enregistrement disponible');
       return;
     }
 
@@ -96,10 +101,11 @@ export const Record = () => {
       const finalDuration = preciseDuration ?? duration;
 
       await upload(file, title, extension, Math.max(1, finalDuration));
+      toast.success('Sonnerie enregistrée ✔️');
       navigate('/dashboard');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors de l\'upload';
-      setError(errorMessage);
+      toast.error(errorMessage);
       console.error('Upload error:', err);
     }
   };
@@ -115,12 +121,6 @@ export const Record = () => {
           <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">
             Enregistrer une sonnerie
           </h1>
-
-          {(error || recorderError) && (
-            <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg">
-              {error || recorderError}
-            </div>
-          )}
 
           <div className="space-y-6">
             <Input

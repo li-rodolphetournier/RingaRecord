@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { useAuthStore } from '../stores/authStore';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -12,12 +13,19 @@ export const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+    }
+  }, [error]);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     clearError();
     
     try {
       await login({ email, password });
+      toast.success('Connexion réussie !');
       navigate('/dashboard');
     } catch {
       // Error is handled by the store
@@ -30,13 +38,6 @@ export const Login = () => {
         <h1 className="text-2xl font-bold mb-6 text-center text-gray-900 dark:text-gray-100">
           Connexion
         </h1>
-        
-        {error && (
-          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 rounded-lg">
-            {error}
-          </div>
-        )}
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             type="email"

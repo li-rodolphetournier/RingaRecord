@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { useAuthStore } from './stores/authStore';
 import { supabaseAuthService } from './services/supabase/auth.service';
 import { Login } from './pages/Login';
@@ -59,6 +61,7 @@ function App() {
         />
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </Routes>
+      <ToastContainer position="top-center" autoClose={3500} hideProgressBar theme="colored" />
     </BrowserRouter>
   );
 }

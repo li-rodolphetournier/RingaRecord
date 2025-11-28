@@ -7,6 +7,7 @@ import { Card } from '../components/ui/Card';
 import { AudioPlayer } from '../components/AudioPlayer';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { toast } from 'react-toastify';
 import type { Ringtone } from '../types/ringtone.types';
 
 export const Dashboard = () => {
@@ -39,7 +40,6 @@ export const Dashboard = () => {
 
   const handleDownload = async (ringtone: Ringtone) => {
     try {
-      // Méthode optimisée pour mobile : télécharger via fetch et créer un blob
       const response = await fetch(ringtone.fileUrl);
       if (!response.ok) {
         throw new Error('Erreur lors du téléchargement du fichier');
@@ -63,9 +63,10 @@ export const Dashboard = () => {
       setTimeout(() => {
         window.URL.revokeObjectURL(url);
       }, 100);
+      toast.success(`Téléchargement prêt : ${ringtone.title}`);
     } catch (error) {
       console.error('Erreur lors du téléchargement:', error);
-      // Fallback: ouvrir dans un nouvel onglet (pour mobile)
+      toast.error('Téléchargement impossible, ouverture dans un nouvel onglet.');
       window.open(ringtone.fileUrl, '_blank');
     }
   };
@@ -80,10 +81,11 @@ export const Dashboard = () => {
 
     try {
       await deleteRingtone(ringtone.id);
+      toast.success('Sonnerie supprimée');
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Impossible de supprimer la sonnerie';
-      alert(message);
+      toast.error(message);
     }
   };
 
