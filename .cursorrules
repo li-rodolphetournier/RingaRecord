@@ -1,0 +1,114 @@
+# .cursorrules
+# Objectif: contraindre Cursor AI à générer du code TypeScript strict, respect des patterns React/Vite/PWA, tests, et PR-friendly.
+# Projet: RingaRecord - Application mobile-first pour création de sonneries
+
+rules:
+  - id: prefer-typescript
+    description: "Toujours générer TypeScript (no implicit any)."
+    match: "file_extension in ['ts', 'tsx', 'tsconfig', 'json']"
+    enforce:
+      - "typescript.strict: true"
+      - "no-implicit-any: true"
+
+  - id: tests-required
+    description: "Générer tests unitaires pour tout module non trivial (>20 LOC)."
+    match: "file.length > 20 and file.extension in ['ts', 'tsx']"
+    enforce:
+      - "ensure-test-file: true"
+      - "test-framework: 'vitest'"
+
+  - id: no-any
+    description: "Interdire any dans les nouveaux fichiers."
+    match: "file.extension in ['ts','tsx']"
+    enforce:
+      - "lint-rule: '@typescript-eslint/no-explicit-any': 'error'"
+
+  - id: audio-service-pattern
+    description: "Services audio doivent utiliser Web Audio API ou MediaRecorder, avec gestion d'erreurs et cleanup."
+    match: "file.path contains 'services/audio'"
+    enforce:
+      - "use-web-audio-api: true"
+      - "error-handling: required"
+      - "cleanup-resources: required"
+
+  - id: pwa-offline-first
+    description: "Fonctionnalités critiques doivent fonctionner hors ligne (IndexedDB, Service Worker)."
+    match: "file.path contains 'services/storage' or file.path contains 'hooks/usePWA'"
+    enforce:
+      - "offline-capable: true"
+      - "indexeddb-fallback: true"
+
+  - id: mobile-first-components
+    description: "Composants UI doivent être mobile-first (touch-friendly, responsive)."
+    match: "file.path contains 'components/'"
+    enforce:
+      - "min-touch-target: '44x44px'"
+      - "responsive-design: true"
+      - "tailwind-mobile-first: true"
+
+  - id: audio-permissions
+    description: "Toujours vérifier et demander permissions microphone avant utilisation."
+    match: "file.path contains 'recorder' or file.path contains 'microphone'"
+    enforce:
+      - "permission-check: required"
+      - "user-feedback: required"
+
+  - id: pr-checklist-gen
+    description: "Lors de la génération d'une nouvelle feature, produire un template PR description."
+    match: "git.branch startswith 'feat/'"
+    enforce:
+      - "generate-pr-template: true"
+      - "pr-template: |
+          - Contexte / objectif
+          - Changements clés
+          - Tests (unitaires, intégration, E2E)
+          - Checklist: lint, tests, build, smoke test, mobile test
+          - Impact PWA/offline
+        "
+
+  - id: generate-docs
+    description: "Pour tout service nouveau, générer JSDoc et types explicites."
+    match: "file.path contains 'services/'"
+    enforce:
+      - "jsdoc-comments: true"
+      - "explicit-types: true"
+
+  - id: format-validation
+    description: "Validation formats audio (durée, taille, type) avant traitement."
+    match: "file.path contains 'converter' or file.path contains 'ringtone'"
+    enforce:
+      - "format-validation: required"
+      - "zod-schema: preferred"
+
+preferences:
+  code-style:
+    indent: 2
+    semi: true
+    quotes: single
+    trailing-comma: es5
+
+  architecture:
+    - "React Hooks pour logique réutilisable"
+    - "Services séparés pour logique métier"
+    - "Zustand pour state global léger"
+    - "IndexedDB pour stockage persistant"
+    - "Service Worker pour cache et offline"
+
+  audio-best-practices:
+    - "Toujours libérer ressources audio (cleanup)"
+    - "Gérer erreurs MediaRecorder gracieusement"
+    - "Valider formats avant conversion"
+    - "Limiter durée sonneries (30-40s max)"
+    - "Optimiser taille fichiers (compression)"
+
+  pwa-requirements:
+    - "Service Worker avec Workbox"
+    - "Manifest.json complet"
+    - "Cache stratégies pour assets"
+    - "Mode offline fonctionnel"
+    - "Installation prompt"
+
+completion:
+  max_tokens: 1200
+  prefer_tests: true
+  prefer-hooks: true
