@@ -15,6 +15,8 @@ export const Record = () => {
     isRecording,
     isPaused,
     duration,
+    recordingMimeType,
+    fileExtension,
     startRecording,
     stopRecording,
     pauseRecording,
@@ -25,6 +27,24 @@ export const Record = () => {
 
   const [title, setTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  const getBlobDuration = async (blob: Blob): Promise<number | null> => {
+    try {
+      const arrayBuffer = await blob.arrayBuffer();
+      const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextClass) {
+        return null;
+      }
+      const audioContext = new AudioContextClass();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      const seconds = Math.round(audioBuffer.duration);
+      await audioContext.close();
+      return seconds;
+    } catch (durationError) {
+      console.error('Impossible de calculer la durée audio:', durationError);
+      return null;
+    }
+  };
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -42,7 +62,7 @@ export const Record = () => {
     setError(null);
     try {
       await startRecording();
-    } catch (err) {
+    } catch {
       setError('Impossible d\'accéder au microphone');
     }
   };
@@ -65,9 +85,17 @@ export const Record = () => {
 
     try {
       // Créer un fichier à partir du blob
-      const file = new File([audioBlob], `${title}.webm`, { type: 'audio/webm' });
-      
-      await upload(file, title, 'webm', duration);
+      const extension = fileExtension || 'm4a';
+      const safeMimeType = recordingMimeType || 'audio/mp4';
+      const sanitizedTitle = title.trim().replace(/[^a-zA-Z0-9_-]+/g, '_') || 'ringtone';
+      const filename = `${sanitizedTitle}.${extension}`;
+      const file = new File([audioBlob], filename, { type: safeMimeType });
+
+      // Calculer la durée réelle du fichier audio pour éviter les valeurs 0
+      const preciseDuration = await getBlobDuration(audioBlob);
+      const finalDuration = preciseDuration ?? duration;
+
+      await upload(file, title, extension, Math.max(1, finalDuration));
       navigate('/dashboard');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors de l\'upload';

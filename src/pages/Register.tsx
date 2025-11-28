@@ -33,7 +33,7 @@ export const Register = () => {
         setTimeout(() => navigate('/dashboard'), 1000);
       }
       // Sinon, le message d'erreur du store indiquera qu'il faut confirmer l'email
-    } catch (err) {
+    } catch {
       // Error is handled by the store
     }
   };

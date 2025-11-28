@@ -22,18 +22,13 @@
 
 ### 3. Configurer les variables d'environnement
 
-**Backend (`server/api/.env`) :**
-```env
-SUPABASE_URL=https://xxxxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...
-PORT=3000
-```
-
-**Frontend (`.env` ou `.env.local`) :**
+Le dépôt ne contient plus de backend NestJS.  
+Ajoute simplement un `.env` (non versionné) à la racine du projet Vite :
 ```env
 VITE_SUPABASE_URL=https://xxxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGc...
 ```
+> Conserve la `service_role key` côté Supabase (ou coffre-fort). Ne l'expose jamais au frontend.
 
 ### 4. Structure des fichiers dans Storage
 Les fichiers seront organisés ainsi :
@@ -45,11 +40,7 @@ ringtones/
 
 ### 5. Test de connexion
 ```bash
-# Backend
-cd server/api
-npm run start:dev
-
-# Frontend
+npm install
 npm run dev
 ```
 

@@ -80,22 +80,15 @@ C'est le mot de passe que tu as défini lors de la création du projet.
 4. Cliquer sur **"Create bucket"**
 5. Aller dans **SQL Editor** et exécuter `supabase/migrations/002_create_storage_bucket.sql`
 
-## 📋 Étape 7 : Créer un fichier de configuration
+## 📋 Étape 7 : Créer le fichier `.env` frontend
 
-Une fois toutes les informations récupérées, crée ces fichiers :
-
-### Backend (`server/api/.env`)
-```env
-SUPABASE_URL=https://xxxxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-PORT=3000
-```
-
-### Frontend (`.env` ou `.env.local`)
+Le backend auto-hébergé a été retiré.  
+Il suffit d'ajouter un `.env` (non versionné) à la racine du projet Vite :
 ```env
 VITE_SUPABASE_URL=https://xxxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
+> Conserve la `service_role key` côté Supabase (ou dans un coffre-fort) et n'envoyez jamais cette clé au frontend.
 
 ## 📸 Où trouver chaque information (visuel)
 
@@ -122,11 +115,11 @@ Dashboard Supabase
 - [ ] Projet Supabase créé
 - [ ] Project URL noté
 - [ ] Anon Key noté (pour frontend)
-- [ ] Service Role Key noté (pour backend)
+- [ ] Service Role Key noté (stockée dans un coffre-fort, jamais côté frontend)
 - [ ] Table `ringtones` créée (SQL Editor)
 - [ ] Bucket `ringtones` créé dans Storage
 - [ ] Policies Storage configurées (SQL Editor)
-- [ ] Fichiers `.env` créés avec les credentials
+- [ ] Fichier `.env` frontend créé avec les credentials publics
 
 ## 🔒 Sécurité
 

@@ -119,14 +119,51 @@ export const supabaseRingtonesService = {
   },
 
   async delete(id: string): Promise<void> {
-    const { error } = await supabase
+    // Récupérer l'URL du fichier avant suppression
+    const { data: ringtone, error: fetchError } = await supabase
+      .from('ringtones')
+      .select('file_url')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) {
+      throw new Error(`Failed to find ringtone: ${fetchError.message}`);
+    }
+
+    const fileUrl = ringtone?.file_url as string | undefined;
+
+    // Supprimer le fichier du storage si possible
+    if (fileUrl) {
+      const storagePath = this.extractStoragePath(fileUrl);
+      if (storagePath) {
+        const { error: storageError } = await supabase.storage
+          .from('ringtones')
+          .remove([storagePath]);
+
+        if (storageError) {
+          console.warn('Failed to delete file from storage:', storageError.message);
+        }
+      }
+    }
+
+    // Supprimer l'entrée dans la base
+    const { error: deleteError } = await supabase
       .from('ringtones')
       .delete()
       .eq('id', id);
 
-    if (error) {
-      throw new Error(`Failed to delete ringtone: ${error.message}`);
+    if (deleteError) {
+      throw new Error(`Failed to delete ringtone: ${deleteError.message}`);
     }
+  },
+
+  extractStoragePath(fileUrl: string): string | null {
+    // Format attendu: https://.../storage/v1/object/public/ringtones/{userId}/{filename}
+    const parts = fileUrl.split('/ringtones/');
+    if (parts.length !== 2) {
+      return null;
+    }
+    return parts[1];
   },
 
   async upload(file: File, title: string, format: string, duration: number): Promise<Ringtone> {

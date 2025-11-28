@@ -31,3 +31,7 @@ dist-ssr
 .env.production.local
 SUPABASE_CREDENTIALS_TEMPLATE.md
 *.credentials
+
+# Supabase generated artifacts (handled outside repo)
+supabase/migrations/
+supabase/.temp/

@@ -1,57 +1,53 @@
-# Résolution des erreurs Network Error
+# Résolution des erreurs Supabase / Network Error
 
 ## Problème : Network Error lors du login/register
 
-### Vérifications à faire :
+### Checklist Supabase
 
-1. **Vérifier que le backend est démarré :**
-   ```bash
-   cd server/api
-   npm run start:dev
-   ```
-   Tu devrais voir : `🚀 Server running on http://localhost:3000`
+1. **Variables d'environnement**
+   - Vérifier le fichier `.env` à la racine :
+     ```env
+     VITE_SUPABASE_URL=...
+     VITE_SUPABASE_ANON_KEY=...
+     ```
+   - Redémarrer `npm run dev` après modification.
 
-2. **Vérifier que PostgreSQL est démarré :**
-   ```bash
-   cd server
-   docker-compose up -d
-   ```
+2. **Projet Supabase actif**
+   - Dashboard Supabase → **Settings → API**
+   - Vérifier que l'URL et l'anon key copiées correspondent au projet actuel.
 
-3. **Vérifier l'URL de l'API dans le frontend :**
-   - Le fichier `.env.local` doit contenir : `VITE_API_URL=http://localhost:3000`
-   - Redémarrer le serveur Vite après modification du .env
+3. **Table `ringtones`**
+   - Dashboard → **Table Editor**
+   - Vérifier que la table existe et que les policies RLS sont en place (`user_id = auth.uid()`).
 
-4. **Vérifier CORS :**
-   - Le backend doit accepter les requêtes depuis `http://localhost:5173`
-   - Vérifier dans `server/api/src/main.ts` que CORS est configuré
+4. **Bucket Storage**
+   - Dashboard → **Storage**
+   - Bucket `ringtones` présent et configuré en public.
 
-5. **Tester manuellement l'API :**
-   ```bash
-   # Test de connexion
-   curl http://localhost:3000/auth/register \
-     -H "Content-Type: application/json" \
-     -d '{"email":"test@test.com","password":"test123"}'
-   ```
+5. **Auth**
+   - Dashboard → **Authentication → Users**
+   - Vérifier si la création de compte apparaît.
+   - Section **Redirect URLs** : ajouter `http://localhost:5173` si nécessaire.
 
-### Solutions :
+### Diagnostic côté frontend
 
-1. **Redémarrer le backend :**
-   ```bash
-   cd server/api
-   npm run start:dev
-   ```
+1. **Console navigateur**
+   - DevTools (F12) → onglet Console pour les erreurs Supabase détaillées.
+   - Vérifier l'onglet Network pour voir la requête Supabase en erreur.
 
-2. **Redémarrer le frontend :**
+2. **Logs applicatifs**
+   - Les services `src/services/supabase/*.ts` loggent les erreurs. Vérifier la console (terminal + navigateur).
+
+3. **Horloge système**
+   - Supabase rejette les requêtes si l'horloge locale est trop décalée. Vérifier la date/heure de la machine.
+
+### Solutions rapides
+
+1. Relancer le serveur Vite :
    ```bash
    npm run dev
    ```
-
-3. **Vérifier les ports :**
-   - Backend : port 3000
-   - Frontend : port 5173 (Vite par défaut)
-
-4. **Vérifier la console du navigateur :**
-   - Ouvrir les DevTools (F12)
-   - Onglet Console pour voir les erreurs détaillées
-   - Onglet Network pour voir les requêtes échouées
+2. Regénérer les clés Supabase (Settings → API) si elles ont été révoquées.
+3. Vérifier que le bucket Storage accepte le type MIME du fichier audio.
+4. S'assurer que l'utilisateur est connecté (`authStore`) avant d'appeler les services RLS.
 

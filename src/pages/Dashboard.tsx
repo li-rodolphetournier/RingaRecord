@@ -12,7 +12,7 @@ import type { Ringtone } from '../types/ringtone.types';
 export const Dashboard = () => {
   const navigate = useNavigate();
   const { isAuthenticated, logout } = useAuthStore();
-  const { ringtones, fetchAll, isLoading } = useRingtoneStore();
+  const { ringtones, fetchAll, isLoading, delete: deleteRingtone } = useRingtoneStore();
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -67,6 +67,23 @@ export const Dashboard = () => {
       console.error('Erreur lors du téléchargement:', error);
       // Fallback: ouvrir dans un nouvel onglet (pour mobile)
       window.open(ringtone.fileUrl, '_blank');
+    }
+  };
+
+  const handleDelete = async (ringtone: Ringtone) => {
+    const confirmed = window.confirm(
+      `Supprimer la sonnerie "${ringtone.title}" ? Cette action est définitive.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await deleteRingtone(ringtone.id);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Impossible de supprimer la sonnerie';
+      alert(message);
     }
   };
 
@@ -148,6 +165,16 @@ export const Dashboard = () => {
                     className="flex-1 min-h-[44px]"
                   >
                     Détails
+                  </Button>
+                  <Button
+                    onClick={() => handleDelete(ringtone)}
+                    variant="danger"
+                    className="flex-1 min-h-[44px]"
+                  >
+                    <svg className="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Supprimer
                   </Button>
                 </div>
               </Card>

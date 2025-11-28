@@ -1,75 +1,72 @@
-# React + TypeScript + Vite
+# RingaRecord (Supabase Edition)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Application mobile-first (React + Vite + TypeScript) pour enregistrer, gérer et télécharger des sonneries.  
+Le backend auto-hébergé a été supprimé : l'app consomme directement **Supabase (Auth + Postgres + Storage)**.
 
-Currently, two official plugins are available:
+## ⚙️ Prérequis
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Node.js 22+
+- Compte Supabase (projet + bucket Storage configurés)
+- Clés Supabase :
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_ANON_KEY`
 
-## React Compiler
+Consulte `SUPABASE_SETUP_GUIDE.md` et `supabase/README.md` pour la création du projet et l'exécution des migrations SQL.
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+## 🚀 Démarrage
 
-Note: This will impact Vite dev & build performances.
+```bash
+npm install
 
-## Expanding the ESLint configuration
+# Ajouter un fichier .env à la racine
+echo "VITE_SUPABASE_URL=https://XXXX.supabase.co" >> .env
+echo "VITE_SUPABASE_ANON_KEY=ey..." >> .env
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 📁 Structure
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+src/
+├── components/           # UI + audio player
+├── hooks/                # useAudioRecorder, etc.
+├── services/
+│   └── supabase/         # client + auth + ringtones services
+├── stores/               # Zustand stores (auth, ringtones)
+├── pages/                # Login / Register / Dashboard / Record
+└── types/                # Types partagés
+
+supabase/
+├── migrations/           # SQL à exécuter dans Supabase
+└── README.md             # Rappels de configuration
+```
+
+## 🧪 Scripts
+
+| Commande        | Description                       |
+|-----------------|-----------------------------------|
+| `npm run dev`   | Démarre Vite avec HMR             |
+| `npm run build` | Compile TypeScript + bundle Vite  |
+| `npm run preview` | Prévisualise le build           |
+| `npm run lint`  | ESLint (config strict TypeScript) |
+
+## 🔐 Sécurité
+
+- **Anon key** uniquement côté frontend.
+- La **service role key** reste dans Supabase / coffre-fort (pas dans le dépôt).
+- RLS activé sur la table `ringtones`.
+- Bucket Storage `ringtones` en lecture publique, upload contrôlé par les policies.
+
+## 📱 Distribution mobile
+
+Consulte `GOOGLE_PLAY_SETUP.md` pour la configuration TWA / PWA et la publication sur le Play Store.
+
+## 🤝 Contribution
+
+1. `git clone`
+2. `npm install`
+3. Créer un `.env` avec les clés Supabase
+4. Respecter les règles des `.cursorrules` (TypeScript strict, tests, mobile-first)
+
+Bonne création de sonneries ! 🎵

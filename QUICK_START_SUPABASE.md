@@ -61,29 +61,23 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 6. Ouvre `supabase/migrations/002_create_storage_bucket.sql`
 7. Copie-colle et exécute
 
-### 5️⃣ Créer les fichiers .env
+### 5️⃣ Créer le `.env` frontend
 
-**Créer `server/api/.env` :**
-```env
-SUPABASE_URL=https://xxxxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-PORT=3000
-```
-
-**Créer `.env` à la racine (pour le frontend) :**
+Le backend local a été retiré. Il suffit désormais de configurer Vite :
 ```env
 VITE_SUPABASE_URL=https://xxxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
+> Conserve la `service_role key` dans Supabase (ou un coffre-fort) mais ne l'ajoute pas dans le dépôt.
 
 ## ✅ Vérification
 
 Une fois tout fait, tu devrais avoir :
 - ✅ Un projet Supabase créé
-- ✅ Les 3 credentials notés (URL, anon key, service_role key)
+- ✅ Les credentials notés (URL + anon key, service_role key stockée à part)
 - ✅ La table `ringtones` créée (vérifie dans Table Editor)
 - ✅ Le bucket `ringtones` créé (vérifie dans Storage)
-- ✅ Les 2 fichiers `.env` créés
+- ✅ Le fichier `.env` frontend créé
 
 ## 🎯 Prochaine étape
 

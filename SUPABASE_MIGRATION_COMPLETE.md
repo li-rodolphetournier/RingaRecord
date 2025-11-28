@@ -1,85 +1,61 @@
-# Migration Supabase - État d'avancement
+# Migration Supabase – État final
 
-## ✅ Terminé
+La stack backend locale (NestJS + Prisma + PostgreSQL) a été **retirée du dépôt**.  
+Le produit repose désormais uniquement sur **Supabase (Auth + DB + Storage)** directement consommé depuis le frontend Vite.
 
-1. **Backend NestJS migré vers Supabase**
-   - ✅ Service Supabase créé (`server/api/src/supabase/`)
-   - ✅ Auth service adapté pour utiliser Supabase Auth
-   - ✅ Ringtones service adapté pour utiliser Supabase DB
-   - ✅ Upload service adapté pour utiliser Supabase Storage
-   - ✅ Guard d'authentification Supabase créé
-   - ✅ Modules mis à jour (AuthModule, RingtonesModule, UploadModule, AppModule)
-   - ✅ Fichiers Prisma supprimés
+## ✅ Ce qui est en place
 
-2. **Frontend migré vers Supabase**
-   - ✅ Client Supabase créé (`src/services/supabase/client.ts`)
-   - ✅ Services Supabase créés (auth, ringtones)
-   - ✅ Stores adaptés (authStore, ringtoneStore)
-   - ✅ App.tsx mis à jour pour gérer l'auth Supabase
-   - ✅ Build frontend réussi
+1. **Frontend Supabase-first**
+   - Client Supabase (`src/services/supabase/client.ts`)
+   - Services Auth / Ringtones (`src/services/supabase/*.ts`)
+   - Stores Zustand adaptés (`authStore`, `ringtoneStore`)
+   - Pages Login / Register / Dashboard branchées sur Supabase
 
-3. **Fichiers de configuration**
-   - ✅ `.env.example` créé pour backend et frontend
-   - ✅ Migration SQL créée (`supabase/migrations/001_initial_schema.sql`)
+2. **Infrastructure Supabase**
+   - Scripts SQL dans `supabase/migrations/*.sql`
+   - Guides d’installation Supabase (README, quick start, troubleshooting)
+   - Documentation Google Play / TWA alignée avec la nouvelle archi
 
-## 📋 À faire manuellement
+3. **Nettoyage**
+   - Dossier `server/` supprimé (legacy backend)
+   - Prisma, docker-compose et services REST locaux retirés
+   - Dossier `src/services/api/` supprimé
 
-### 1. Créer le bucket Storage dans Supabase
+## 📋 À faire côté Supabase
 
-1. Aller dans **Storage** dans le dashboard Supabase
-2. Cliquer sur **New bucket**
-3. Nom: `ringtones`
-4. Public: ✅ **Oui** (pour que les fichiers soient accessibles publiquement)
-5. File size limit: 10 MB (ou plus selon vos besoins)
-6. Allowed MIME types: `audio/*,video/*`
+### 1. Créer le bucket Storage
+1. Dashboard Supabase → **Storage**
+2. `New bucket` → nom `ringtones`, accès **public**
+3. Taille max recommandée: 10 MB
+4. Types autorisés: `audio/*,video/*`
 
-### 2. Exécuter la migration SQL
+### 2. Exécuter les migrations SQL
+1. Dashboard → **SQL Editor**
+2. Coller le contenu de `supabase/migrations/001_initial_schema.sql`
+3. Lancer l’exécution (répéter pour les migrations suivantes si besoin)
 
-1. Aller dans **SQL Editor** dans le dashboard Supabase
-2. Copier le contenu de `supabase/migrations/001_initial_schema.sql`
-3. Coller dans l'éditeur SQL
-4. Cliquer sur **Run**
-
-### 3. Configurer les variables d'environnement
-
-#### Backend (`server/api/.env`)
-```env
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
-PORT=3000
-```
-
-#### Frontend (`.env`)
+### 3. Configurer l’environnement frontend
+Créer un `.env` (non versionné) à la racine:
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key-here
+VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-### 4. Tester l'application
-
-1. Démarrer le backend: `cd server/api && npm run start:dev`
-2. Démarrer le frontend: `npm run dev`
-3. Tester l'inscription/connexion
-4. Tester l'enregistrement et l'upload d'une sonnerie
-
-## 🗑️ Fichiers à supprimer (optionnel)
-
-Si vous êtes sûr que tout fonctionne, vous pouvez supprimer:
-- `server/prisma/` (dossier Prisma)
-- `server/api/src/services/api/` (anciens services REST, si vous n'utilisez plus le backend NestJS)
-- `docker-compose.yml` (si vous aviez un setup PostgreSQL local)
+### 4. Tester l’application
+1. `npm install`
+2. `npm run dev`
+3. Tester inscription / connexion Supabase
+4. Tester enregistrement + upload + lecture de sonneries
 
 ## 📝 Notes importantes
 
-- **RLS (Row Level Security)** est activé sur la table `ringtones`. Les utilisateurs ne peuvent accéder qu'à leurs propres données.
-- Le **Service Role Key** est utilisé côté backend pour bypasser RLS si nécessaire.
-- L'**Anon Key** est utilisée côté frontend et respecte les policies RLS.
-- Les fichiers audio sont stockés dans Supabase Storage dans le bucket `ringtones`.
+- **RLS** doit rester actif sur la table `ringtones` (seul l’utilisateur courant voit ses données).
+- Utilisez exclusivement l’**anon key** côté frontend. Pour des scripts serveur, créez un service dédié ou des Edge Functions.
+- Les fichiers audio sont servis via le bucket Supabase `ringtones` (public).
 
 ## 🚀 Prochaines étapes
 
-1. Configurer Supabase (bucket + migration SQL)
-2. Ajouter les variables d'environnement
-3. Tester l'application
-4. Configurer la PWA pour Google Play Store (TWA)
-
+1. Finaliser la configuration Supabase (bucket + migrations)
+2. Valider l’expérience mobile + PWA
+3. Préparer la publication Google Play via TWA
+4. Ajouter des tests E2E pour les flux critiques
