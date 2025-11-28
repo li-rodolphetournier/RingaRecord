@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { useAuthStore } from '../stores/authStore';
 import { useRingtoneStore } from '../stores/ringtoneStore';
 import { Button } from '../components/ui/Button';
@@ -7,7 +8,6 @@ import { Card } from '../components/ui/Card';
 import { AudioPlayer } from '../components/AudioPlayer';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { toast } from 'react-toastify';
 import type { Ringtone } from '../types/ringtone.types';
 
 export const Dashboard = () => {
@@ -71,22 +71,47 @@ export const Dashboard = () => {
     }
   };
 
-  const handleDelete = async (ringtone: Ringtone) => {
-    const confirmed = window.confirm(
-      `Supprimer la sonnerie "${ringtone.title}" ? Cette action est définitive.`,
-    );
-    if (!confirmed) {
-      return;
-    }
-
+  const deleteWithToast = async (ringtone: Ringtone, closeToast?: () => void) => {
     try {
       await deleteRingtone(ringtone.id);
+      closeToast?.();
       toast.success('Sonnerie supprimée');
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Impossible de supprimer la sonnerie';
+      closeToast?.();
       toast.error(message);
     }
+  };
+
+  const handleDelete = (ringtone: Ringtone) => {
+    toast.info(({ closeToast }) => (
+      <div className="space-y-3">
+        <p className="font-semibold text-gray-900 dark:text-gray-100">
+          Supprimer « {ringtone.title} » ?
+        </p>
+        <p className="text-sm text-gray-600 dark:text-gray-300">
+          Cette action est définitive.
+        </p>
+        <div className="flex gap-2">
+          <Button
+            variant="danger"
+            className="flex-1"
+            onClick={() => deleteWithToast(ringtone, closeToast)}
+          >
+            Supprimer
+          </Button>
+          <Button variant="secondary" className="flex-1" onClick={closeToast}>
+            Annuler
+          </Button>
+        </div>
+      </div>
+    ), {
+      autoClose: false,
+      closeOnClick: false,
+      draggable: false,
+      position: 'top-center',
+    });
   };
 
 
@@ -160,13 +185,6 @@ export const Dashboard = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
                     Enregistrer sur téléphone
-                  </Button>
-                  <Button
-                    onClick={() => navigate(`/ringtones/${ringtone.id}`)}
-                    variant="secondary"
-                    className="flex-1 min-h-[44px]"
-                  >
-                    Détails
                   </Button>
                   <Button
                     onClick={() => handleDelete(ringtone)}
