@@ -24,9 +24,10 @@ export const Record = () => {
     resumeRecording,
     getAudioBlob,
     error: recorderError,
-  } = useAudioRecorder();
+  } = useAudioRecorder({ gain });
 
   const [title, setTitle] = useState('');
+  const [gain, setGain] = useState(2.0); // Gain par défaut : 2x (double le volume)
 
   const getBlobDuration = async (blob: Blob): Promise<number | null> => {
     try {
@@ -130,6 +131,33 @@ export const Record = () => {
               placeholder="Ma sonnerie personnalisée"
               disabled={isRecording}
             />
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Volume d'enregistrement: {gain.toFixed(1)}x
+                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                  ({gain === 1.0 ? 'Normal' : gain < 2.0 ? 'Léger boost' : gain < 3.0 ? 'Boost moyen' : 'Boost fort'})
+                </span>
+              </label>
+              <input
+                type="range"
+                min="1.0"
+                max="4.0"
+                step="0.1"
+                value={gain}
+                onChange={(e) => setGain(parseFloat(e.target.value))}
+                disabled={isRecording}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600"
+              />
+              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                <span>1.0x (Normal)</span>
+                <span>2.0x (Recommandé)</span>
+                <span>4.0x (Max)</span>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                💡 Augmente le volume d'enregistrement. Au-delà de 3.0x, risque de distorsion.
+              </p>
+            </div>
 
             <div className="text-center py-8">
               <div className="text-6xl font-mono mb-4 text-gray-900 dark:text-gray-100">

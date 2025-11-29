@@ -5,6 +5,10 @@ interface RecordingFormat {
   extension: string;
 }
 
+interface UseAudioRecorderOptions {
+  gain?: number; // Gain multiplier (1.0 = normal, 2.0 = double, etc.)
+}
+
 interface UseAudioRecorderReturn {
   isRecording: boolean;
   isPaused: boolean;
@@ -49,7 +53,8 @@ const getSupportedFormat = (): RecordingFormat => {
   return FALLBACK_FORMAT;
 };
 
-export const useAudioRecorder = (): UseAudioRecorderReturn => {
+export const useAudioRecorder = (options: UseAudioRecorderOptions = {}): UseAudioRecorderReturn => {
+  const { gain = 1.0 } = options;
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -59,6 +64,9 @@ export const useAudioRecorder = (): UseAudioRecorderReturn => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const originalStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
   const durationIntervalRef = useRef<number | null>(null);
 
   const startDurationTimer = useCallback(() => {
@@ -77,8 +85,37 @@ export const useAudioRecorder = (): UseAudioRecorderReturn => {
   const startRecording = useCallback(async () => {
     try {
       setError(null);
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
+      const originalStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      originalStreamRef.current = originalStream;
+
+      let streamToUse = originalStream;
+
+      // Si gain > 1.0, amplifier le signal avec Web Audio API
+      if (gain > 1.0) {
+        try {
+          const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+          if (AudioContextClass) {
+            const audioContext = new AudioContextClass();
+            audioContextRef.current = audioContext;
+
+            const source = audioContext.createMediaStreamSource(originalStream);
+            const gainNode = audioContext.createGain();
+            gainNode.gain.value = gain;
+            gainNodeRef.current = gainNode;
+
+            const destination = audioContext.createMediaStreamDestination();
+            source.connect(gainNode);
+            gainNode.connect(destination);
+
+            streamToUse = destination.stream;
+          }
+        } catch (audioError) {
+          console.warn('Web Audio API not available, using original stream:', audioError);
+          // Fallback: utiliser le stream original si Web Audio échoue
+        }
+      }
+
+      streamRef.current = streamToUse;
 
       const selectedFormat = getSupportedFormat();
       setRecordingFormat(selectedFormat);
@@ -88,8 +125,8 @@ export const useAudioRecorder = (): UseAudioRecorderReturn => {
         : undefined;
 
       const mediaRecorder = recorderOptions
-        ? new MediaRecorder(stream, recorderOptions)
-        : new MediaRecorder(stream);
+        ? new MediaRecorder(streamToUse, recorderOptions)
+        : new MediaRecorder(streamToUse);
 
       audioChunksRef.current = [];
 
@@ -100,10 +137,18 @@ export const useAudioRecorder = (): UseAudioRecorderReturn => {
       };
 
       mediaRecorder.onstop = () => {
-        if (streamRef.current) {
-          streamRef.current.getTracks().forEach((track) => track.stop());
-          streamRef.current = null;
+        // Arrêter le stream original
+        if (originalStreamRef.current) {
+          originalStreamRef.current.getTracks().forEach((track) => track.stop());
+          originalStreamRef.current = null;
         }
+        // Nettoyer AudioContext si utilisé
+        if (audioContextRef.current) {
+          audioContextRef.current.close().catch(console.error);
+          audioContextRef.current = null;
+        }
+        gainNodeRef.current = null;
+        streamRef.current = null;
         stopDurationTimer();
       };
 
@@ -118,7 +163,7 @@ export const useAudioRecorder = (): UseAudioRecorderReturn => {
       setError(message);
       console.error('Error starting recording:', err);
     }
-  }, [startDurationTimer, stopDurationTimer]);
+  }, [gain, startDurationTimer, stopDurationTimer]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
