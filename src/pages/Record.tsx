@@ -12,6 +12,11 @@ export const Record = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
   const { upload, isLoading: isUploading } = useRingtoneStore();
+  
+  // Déclarer gain et title avant l'appel à useAudioRecorder
+  const [title, setTitle] = useState('');
+  const [gain, setGain] = useState(2.0); // Gain par défaut : 2x (double le volume)
+  
   const {
     isRecording,
     isPaused,
@@ -25,9 +30,6 @@ export const Record = () => {
     getAudioBlob,
     error: recorderError,
   } = useAudioRecorder({ gain });
-
-  const [title, setTitle] = useState('');
-  const [gain, setGain] = useState(2.0); // Gain par défaut : 2x (double le volume)
 
   const getBlobDuration = async (blob: Blob): Promise<number | null> => {
     try {
