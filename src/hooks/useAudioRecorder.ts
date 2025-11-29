@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 interface RecordingFormat {
   mimeType: string;
@@ -61,6 +61,9 @@ export const useAudioRecorder = (options: UseAudioRecorderOptions = {}): UseAudi
   const [error, setError] = useState<string | null>(null);
   const [recordingFormat, setRecordingFormat] = useState<RecordingFormat>(FALLBACK_FORMAT);
   
+  // Utiliser un ref pour stocker le gain actuel (évite de recréer les callbacks)
+  const gainRef = useRef<number>(gain);
+  
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
@@ -68,6 +71,11 @@ export const useAudioRecorder = (options: UseAudioRecorderOptions = {}): UseAudi
   const audioContextRef = useRef<AudioContext | null>(null);
   const gainNodeRef = useRef<GainNode | null>(null);
   const durationIntervalRef = useRef<number | null>(null);
+
+  // Mettre à jour le ref du gain quand il change
+  useEffect(() => {
+    gainRef.current = gain;
+  }, [gain]);
 
   const startDurationTimer = useCallback(() => {
     durationIntervalRef.current = window.setInterval(() => {
@@ -90,8 +98,11 @@ export const useAudioRecorder = (options: UseAudioRecorderOptions = {}): UseAudi
 
       let streamToUse = originalStream;
 
+      // Utiliser le gain depuis le ref (toujours la valeur la plus récente)
+      const currentGain = gainRef.current;
+      
       // Si gain > 1.0, amplifier le signal avec Web Audio API
-      if (gain > 1.0) {
+      if (currentGain > 1.0) {
         try {
           const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
           if (AudioContextClass) {
@@ -100,7 +111,7 @@ export const useAudioRecorder = (options: UseAudioRecorderOptions = {}): UseAudi
 
             const source = audioContext.createMediaStreamSource(originalStream);
             const gainNode = audioContext.createGain();
-            gainNode.gain.value = gain;
+            gainNode.gain.value = currentGain;
             gainNodeRef.current = gainNode;
 
             const destination = audioContext.createMediaStreamDestination();
@@ -163,7 +174,7 @@ export const useAudioRecorder = (options: UseAudioRecorderOptions = {}): UseAudi
       setError(message);
       console.error('Error starting recording:', err);
     }
-  }, [gain, startDurationTimer, stopDurationTimer]);
+  }, [startDurationTimer, stopDurationTimer]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
