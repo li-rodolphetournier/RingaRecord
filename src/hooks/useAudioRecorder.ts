@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import type { RecordingMode } from '../utils/browserSupport';
 
 interface RecordingFormat {
   mimeType: string;
@@ -7,6 +8,7 @@ interface RecordingFormat {
 
 interface UseAudioRecorderOptions {
   gain?: number; // Gain multiplier (1.0 = normal, 2.0 = double, etc.)
+  mode?: RecordingMode; // Mode d'enregistrement: 'microphone' ou 'system'
 }
 
 interface UseAudioRecorderReturn {
@@ -54,7 +56,7 @@ const getSupportedFormat = (): RecordingFormat => {
 };
 
 export const useAudioRecorder = (options: UseAudioRecorderOptions = {}): UseAudioRecorderReturn => {
-  const { gain = 1.0 } = options;
+  const { gain = 1.0, mode = 'microphone' } = options;
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -63,6 +65,8 @@ export const useAudioRecorder = (options: UseAudioRecorderOptions = {}): UseAudi
   
   // Utiliser un ref pour stocker le gain actuel (évite de recréer les callbacks)
   const gainRef = useRef<number>(gain);
+  // Utiliser un ref pour stocker le mode actuel
+  const modeRef = useRef<RecordingMode>(mode);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -72,10 +76,14 @@ export const useAudioRecorder = (options: UseAudioRecorderOptions = {}): UseAudi
   const gainNodeRef = useRef<GainNode | null>(null);
   const durationIntervalRef = useRef<number | null>(null);
 
-  // Mettre à jour le ref du gain quand il change
+  // Mettre à jour les refs quand ils changent
   useEffect(() => {
     gainRef.current = gain;
   }, [gain]);
+
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
 
   const startDurationTimer = useCallback(() => {
     durationIntervalRef.current = window.setInterval(() => {
@@ -93,7 +101,49 @@ export const useAudioRecorder = (options: UseAudioRecorderOptions = {}): UseAudi
   const startRecording = useCallback(async () => {
     try {
       setError(null);
-      const originalStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      const currentMode = modeRef.current;
+      let originalStream: MediaStream;
+      
+      // Choisir la méthode de capture selon le mode
+      if (currentMode === 'system') {
+        // Capture audio système (getDisplayMedia)
+        // Note: Certains navigateurs nécessitent video: true même si on veut juste l'audio
+        try {
+          const displayStream = await navigator.mediaDevices.getDisplayMedia({
+            video: {
+              displaySurface: 'browser', // Préférer l'onglet navigateur
+            } as MediaTrackConstraints,
+            audio: {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+              suppressLocalAudioPlayback: false, // Important pour capturer le son système
+            } as MediaTrackConstraints,
+          });
+          
+          // Extraire uniquement les pistes audio
+          const audioTracks = displayStream.getAudioTracks();
+          if (audioTracks.length === 0) {
+            throw new Error('Aucune piste audio disponible dans la capture. Assurez-vous de partager l\'audio.');
+          }
+          
+          // Créer un nouveau stream avec uniquement l'audio
+          originalStream = new MediaStream(audioTracks);
+          
+          // Arrêter les pistes vidéo si présentes (pour économiser les ressources)
+          displayStream.getVideoTracks().forEach((track) => {
+            track.stop();
+          });
+        } catch (displayError) {
+          const errorMessage = displayError instanceof Error ? displayError.message : 'Erreur lors de la capture audio système';
+          throw new Error(`Impossible de capturer l'audio système: ${errorMessage}. Essayez de sélectionner un onglet avec du son.`);
+        }
+      } else {
+        // Capture microphone (getUserMedia)
+        originalStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+      
       originalStreamRef.current = originalStream;
 
       let streamToUse = originalStream;

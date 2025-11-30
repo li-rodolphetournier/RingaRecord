@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '../stores/authStore';
@@ -7,6 +7,7 @@ import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
+import { getBrowserSupport, isRecordingModeSupported, getSystemAudioHelpMessage, type RecordingMode } from '../utils/browserSupport';
 
 export const Record = () => {
   const navigate = useNavigate();
@@ -16,6 +17,21 @@ export const Record = () => {
   // Déclarer gain et title avant l'appel à useAudioRecorder
   const [title, setTitle] = useState('');
   const [gain, setGain] = useState(2.0); // Gain par défaut : 2x (double le volume)
+  const [recordingMode, setRecordingMode] = useState<RecordingMode>('microphone');
+  
+  // Détecter le support navigateur
+  const browserSupport = useMemo(() => getBrowserSupport(), []);
+  
+  // S'assurer que le mode sélectionné est supporté
+  useEffect(() => {
+    if (!isRecordingModeSupported(recordingMode)) {
+      // Si le mode système n'est pas supporté, basculer vers microphone
+      if (recordingMode === 'system') {
+        setRecordingMode('microphone');
+        toast.warning('Le mode son système n\'est pas disponible sur votre navigateur. Mode microphone activé.');
+      }
+    }
+  }, [recordingMode]);
   
   const {
     isRecording,
@@ -29,7 +45,7 @@ export const Record = () => {
     resumeRecording,
     getAudioBlob,
     error: recorderError,
-  } = useAudioRecorder({ gain });
+  } = useAudioRecorder({ gain, mode: recordingMode });
 
   const getBlobDuration = async (blob: Blob): Promise<number | null> => {
     try {
@@ -40,8 +56,25 @@ export const Record = () => {
       }
       const audioContext = new AudioContextClass();
       const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      const seconds = Math.round(audioBuffer.duration);
+      
+      // Vérifier que la durée est valide
+      const rawDuration = audioBuffer.duration;
+      if (!Number.isFinite(rawDuration) || rawDuration <= 0 || rawDuration > 300) {
+        // Durée invalide (NaN, Infinity, négative, ou > 5 minutes)
+        console.warn('Durée audio invalide:', rawDuration);
+        await audioContext.close();
+        return null;
+      }
+      
+      const seconds = Math.round(rawDuration);
       await audioContext.close();
+      
+      // S'assurer que la durée est dans une plage acceptable (1-40 secondes pour sonnerie)
+      if (seconds < 1 || seconds > 40) {
+        console.warn('Durée hors plage acceptable pour sonnerie:', seconds);
+        // Retourner quand même la valeur, mais elle sera validée avant l'envoi
+      }
+      
       return seconds;
     } catch (durationError) {
       console.error('Impossible de calculer la durée audio:', durationError);
@@ -70,8 +103,12 @@ export const Record = () => {
   const handleStart = async () => {
     try {
       await startRecording();
-    } catch {
-      toast.error('Impossible d\'accéder au microphone');
+      if (recordingMode === 'system') {
+        toast.info('Sélectionnez l\'onglet ou l\'application avec le son à capturer');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Impossible de démarrer l\'enregistrement';
+      toast.error(errorMessage);
     }
   };
 
@@ -101,9 +138,24 @@ export const Record = () => {
 
       // Calculer la durée réelle du fichier audio pour éviter les valeurs 0
       const preciseDuration = await getBlobDuration(audioBlob);
-      const finalDuration = preciseDuration ?? duration;
+      let finalDuration = preciseDuration ?? duration;
 
-      await upload(file, title, extension, Math.max(1, finalDuration));
+      // Validation stricte de la durée avant l'envoi
+      // Les sonneries doivent avoir une durée entre 1 et 40 secondes
+      if (!Number.isFinite(finalDuration) || finalDuration < 1) {
+        toast.error('Durée d\'enregistrement invalide. L\'enregistrement doit durer au moins 1 seconde.');
+        return;
+      }
+
+      if (finalDuration > 40) {
+        toast.warning(`Durée de ${finalDuration}s supérieure à 40s. La durée sera limitée à 40s.`);
+        finalDuration = 40;
+      }
+
+      // S'assurer que la durée est un entier
+      finalDuration = Math.round(finalDuration);
+
+      await upload(file, title, extension, finalDuration);
       toast.success('Sonnerie enregistrée ✔️');
       navigate('/dashboard');
     } catch (err) {
@@ -133,6 +185,53 @@ export const Record = () => {
               placeholder="Ma sonnerie personnalisée"
               disabled={isRecording}
             />
+
+            {/* Sélecteur de mode d'enregistrement */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Mode d'enregistrement
+              </label>
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => setRecordingMode('microphone')}
+                  disabled={isRecording}
+                  className={`flex-1 px-4 py-3 rounded-lg border-2 transition-colors min-h-[44px] ${
+                    recordingMode === 'microphone'
+                      ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-400'
+                  } ${isRecording ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                >
+                  🎤 Microphone
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecordingMode('system')}
+                  disabled={isRecording || !browserSupport.systemAudio}
+                  className={`flex-1 px-4 py-3 rounded-lg border-2 transition-colors min-h-[44px] ${
+                    recordingMode === 'system'
+                      ? 'border-blue-600 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-400'
+                  } ${isRecording || !browserSupport.systemAudio ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                  title={!browserSupport.systemAudio ? 'Non disponible sur votre navigateur' : undefined}
+                >
+                  🔊 Son système
+                  {!browserSupport.systemAudio && (
+                    <span className="ml-1 text-xs">⚠️</span>
+                  )}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                {recordingMode === 'system' 
+                  ? getSystemAudioHelpMessage()
+                  : '💡 Enregistre depuis votre microphone'}
+              </p>
+              {browserSupport.isMobile && recordingMode === 'system' && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  ⚠️ Sur mobile, la capture audio système peut être limitée. Utilisez le mode microphone pour de meilleurs résultats.
+                </p>
+              )}
+            </div>
 
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -168,7 +267,7 @@ export const Record = () => {
               <div className="flex justify-center gap-4">
                 {!isRecording ? (
                   <Button onClick={handleStart} variant="primary" className="text-lg px-6 py-3">
-                    🎤 Démarrer l'enregistrement
+                    {recordingMode === 'system' ? '🔊' : '🎤'} Démarrer l'enregistrement
                   </Button>
                 ) : (
                   <>

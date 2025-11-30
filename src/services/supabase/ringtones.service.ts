@@ -172,6 +172,15 @@ export const supabaseRingtonesService = {
       throw new Error('User not authenticated');
     }
 
+    // Validation de la durée avant l'envoi
+    // Les sonneries doivent avoir une durée entre 1 et 40 secondes (selon contrainte DB)
+    if (!Number.isFinite(duration) || duration < 1 || duration > 40) {
+      throw new Error(`Durée invalide: ${duration}s. La durée doit être entre 1 et 40 secondes.`);
+    }
+
+    // S'assurer que la durée est un entier
+    const validDuration = Math.round(duration);
+
     // Générer un nom de fichier unique
     const timestamp = Date.now();
     const sanitizedOriginalName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
@@ -194,11 +203,11 @@ export const supabaseRingtonesService = {
     const { data: urlData } = supabase.storage.from('ringtones').getPublicUrl(path);
     const fileUrl = urlData.publicUrl;
 
-    // Créer l'enregistrement dans la base de données
+    // Créer l'enregistrement dans la base de données avec la durée validée
     return this.create({
       title,
       format,
-      duration,
+      duration: validDuration,
       sizeBytes: file.size,
       fileUrl,
     });
