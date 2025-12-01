@@ -16,6 +16,9 @@ export const Dashboard = () => {
   const { isAuthenticated, logout } = useAuthStore();
   const { ringtones, fetchAll, isLoading, delete: deleteRingtone, upload } = useRingtoneStore();
   const [optimizingId, setOptimizingId] = useState<string | null>(null);
+  const [trimRingtoneId, setTrimRingtoneId] = useState<string | null>(null);
+  const [trimStart, setTrimStart] = useState<number>(0);
+  const [trimEnd, setTrimEnd] = useState<number>(0);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -83,7 +86,19 @@ export const Dashboard = () => {
       }
 
       const originalBlob = await response.blob();
-      const { optimizedBlob, durationSeconds } = await optimizeRingtone(originalBlob);
+
+      const hasManualTrim = trimRingtoneId === ringtone.id && ringtone.duration > 1;
+      const options = hasManualTrim
+        ? {
+            manualStartSeconds: Math.max(0, Math.min(trimStart, ringtone.duration - 1)),
+            manualEndSeconds: Math.max(
+              Math.max(0, Math.min(trimStart + 1, ringtone.duration)),
+              Math.min(trimEnd || ringtone.duration, ringtone.duration),
+            ),
+          }
+        : undefined;
+
+      const { optimizedBlob, durationSeconds } = await optimizeRingtone(originalBlob, options);
 
       const extension = ringtone.format;
       const safeMimeType = optimizedBlob.type || 'audio/wav';
@@ -214,36 +229,110 @@ export const Dashboard = () => {
                   <AudioPlayer src={ringtone.fileUrl} title="Écouter" />
                 </div>
 
-                <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                  <Button
-                    onClick={() => handleDownload(ringtone)}
-                    variant="primary"
-                    className="flex-1 min-h-[44px]"
-                  >
-                    <svg className="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    Enregistrer sur téléphone
-                  </Button>
-                  <Button
-                    onClick={() => handleOptimizeExisting(ringtone)}
-                    variant="secondary"
-                    className="flex-1 min-h-[44px]"
-                    isLoading={optimizingId === ringtone.id}
-                    disabled={optimizingId === ringtone.id}
-                  >
-                    ✨ Optimiser
-                  </Button>
-                  <Button
-                    onClick={() => handleDelete(ringtone)}
-                    variant="danger"
-                    className="flex-1 min-h-[44px]"
-                  >
-                    <svg className="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    Supprimer
-                  </Button>
+                <div className="mt-4 flex flex-col gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Button
+                      onClick={() => handleDownload(ringtone)}
+                      variant="primary"
+                      className="flex-1 min-h-[44px]"
+                    >
+                      <svg className="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Enregistrer sur téléphone
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        if (trimRingtoneId === ringtone.id) {
+                          setTrimRingtoneId(null);
+                        } else {
+                          setTrimRingtoneId(ringtone.id);
+                          setTrimStart(0);
+                          setTrimEnd(ringtone.duration);
+                        }
+                      }}
+                      variant="secondary"
+                      className="flex-1 min-h-[44px]"
+                    >
+                      ✂️ Découper / optimiser
+                    </Button>
+                    <Button
+                      onClick={() => handleDelete(ringtone)}
+                      variant="danger"
+                      className="flex-1 min-h-[44px]"
+                    >
+                      <svg className="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      Supprimer
+                    </Button>
+                  </div>
+
+                  {trimRingtoneId === ringtone.id && ringtone.duration > 1 && (
+                    <div className="space-y-3 border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-white/60 dark:bg-gray-800/60">
+                      <div className="flex items-center justify-between text-xs text-gray-700 dark:text-gray-300">
+                        <span className="font-medium">Découpe manuelle</span>
+                        <span className="font-mono">
+                          {Math.max(0, Math.min(trimStart, ringtone.duration))}s →{' '}
+                          {Math.max(
+                            Math.min(trimStart + 1, ringtone.duration),
+                            Math.min(trimEnd || ringtone.duration, ringtone.duration),
+                          )}
+                          s
+                        </span>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="block text-[11px] text-gray-500 dark:text-gray-400">
+                          Début
+                        </label>
+                        <input
+                          type="range"
+                          min={0}
+                          max={Math.max(1, ringtone.duration - 1)}
+                          step={0.1}
+                          value={trimStart}
+                          onChange={(e) => {
+                            const next = parseFloat(e.target.value);
+                            setTrimStart(
+                              Math.min(next, Math.max(0, (trimEnd || ringtone.duration) - 1)),
+                            );
+                          }}
+                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="block text-[11px] text-gray-500 dark:text-gray-400">
+                          Fin
+                        </label>
+                        <input
+                          type="range"
+                          min={Math.min(ringtone.duration - 1, trimStart + 1)}
+                          max={ringtone.duration}
+                          step={0.1}
+                          value={trimEnd || ringtone.duration}
+                          onChange={(e) => {
+                            const next = parseFloat(e.target.value);
+                            setTrimEnd(Math.max(next, trimStart + 1));
+                          }}
+                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600"
+                        />
+                      </div>
+
+                      <div className="flex justify-end">
+                        <Button
+                          onClick={() => handleOptimizeExisting(ringtone)}
+                          variant="secondary"
+                          className="min-h-[36px]"
+                          isLoading={optimizingId === ringtone.id}
+                          disabled={optimizingId === ringtone.id}
+                        >
+                          ✨ Créer une version optimisée découpée
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </Card>
             ))}

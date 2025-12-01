@@ -7,6 +7,10 @@ export interface SmartRingtoneOptions {
   fadeOutSeconds?: number;
   /** Durée max autorisée (en secondes). */
   maxDurationSeconds?: number;
+  /** Début manuel de la découpe (en secondes). Si défini avec manualEndSeconds, remplace l'auto-trim. */
+  manualStartSeconds?: number;
+  /** Fin manuelle de la découpe (en secondes). Doit être > manualStartSeconds. */
+  manualEndSeconds?: number;
 }
 
 export interface SmartRingtoneResult {
@@ -15,7 +19,16 @@ export interface SmartRingtoneResult {
   durationSeconds: number;
 }
 
-const DEFAULT_OPTIONS: Required<SmartRingtoneOptions> = {
+interface InternalSmartOptions {
+  targetPeak: number;
+  fadeInSeconds: number;
+  fadeOutSeconds: number;
+  maxDurationSeconds: number;
+  manualStartSeconds?: number;
+  manualEndSeconds?: number;
+}
+
+const DEFAULT_OPTIONS: InternalSmartOptions = {
   targetPeak: 0.9,
   fadeInSeconds: 0.15,
   fadeOutSeconds: 0.3,
@@ -32,7 +45,7 @@ export async function optimizeRingtone(
   blob: Blob,
   options: SmartRingtoneOptions = {},
 ): Promise<SmartRingtoneResult> {
-  const mergedOptions: Required<SmartRingtoneOptions> = {
+  const mergedOptions: InternalSmartOptions = {
     ...DEFAULT_OPTIONS,
     ...options,
   };
@@ -55,12 +68,24 @@ export async function optimizeRingtone(
   try {
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
 
-    const trimmed = trimSilence(audioBuffer);
-    if (!trimmed) {
+    const hasManualRange =
+      typeof mergedOptions.manualStartSeconds === 'number' &&
+      typeof mergedOptions.manualEndSeconds === 'number' &&
+      mergedOptions.manualEndSeconds > mergedOptions.manualStartSeconds;
+
+    const baseBuffer = hasManualRange
+      ? trimToRange(
+          audioBuffer,
+          mergedOptions.manualStartSeconds as number,
+          mergedOptions.manualEndSeconds as number,
+        )
+      : trimSilence(audioBuffer);
+
+    if (!baseBuffer) {
       throw new Error("Impossible de détecter un son utile dans l'enregistrement.");
     }
 
-    const normalized = normalizeBuffer(trimmed, mergedOptions.targetPeak);
+    const normalized = normalizeBuffer(baseBuffer, mergedOptions.targetPeak);
     const withFades = applyFades(
       normalized,
       mergedOptions.fadeInSeconds,
@@ -147,6 +172,43 @@ function trimSilence(audioBuffer: AudioBuffer): AudioBuffer | null {
     const output = trimmedBuffer.getChannelData(channel);
     for (let i = 0; i < frameCount; i++) {
       output[i] = input[safeStart + i];
+    }
+  }
+
+  return trimmedBuffer;
+}
+
+function trimToRange(
+  audioBuffer: AudioBuffer,
+  startSeconds: number,
+  endSeconds: number,
+): AudioBuffer | null {
+  const sampleRate = audioBuffer.sampleRate;
+  const totalSamples = audioBuffer.length;
+
+  if (!Number.isFinite(startSeconds) || !Number.isFinite(endSeconds)) {
+    return null;
+  }
+
+  const startSample = Math.max(0, Math.min(totalSamples - 1, Math.floor(startSeconds * sampleRate)));
+  const endSample = Math.max(startSample + 1, Math.min(totalSamples, Math.floor(endSeconds * sampleRate)));
+
+  const frameCount = endSample - startSample;
+  if (frameCount <= 0) {
+    return null;
+  }
+
+  const trimmedBuffer = new AudioBuffer({
+    length: frameCount,
+    numberOfChannels: audioBuffer.numberOfChannels,
+    sampleRate: audioBuffer.sampleRate,
+  });
+
+  for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+    const input = audioBuffer.getChannelData(channel);
+    const output = trimmedBuffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      output[i] = input[startSample + i];
     }
   }
 
