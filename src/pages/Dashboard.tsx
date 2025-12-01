@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '../stores/authStore';
@@ -9,11 +9,13 @@ import { AudioPlayer } from '../components/AudioPlayer';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { Ringtone } from '../types/ringtone.types';
+import { optimizeRingtone } from '../services/audio/smartRingtone.service';
 
 export const Dashboard = () => {
   const navigate = useNavigate();
   const { isAuthenticated, logout } = useAuthStore();
-  const { ringtones, fetchAll, isLoading, delete: deleteRingtone } = useRingtoneStore();
+  const { ringtones, fetchAll, isLoading, delete: deleteRingtone, upload } = useRingtoneStore();
+  const [optimizingId, setOptimizingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -68,6 +70,43 @@ export const Dashboard = () => {
       console.error('Erreur lors du téléchargement:', error);
       toast.error('Téléchargement impossible, ouverture dans un nouvel onglet.');
       window.open(ringtone.fileUrl, '_blank');
+    }
+  };
+
+  const handleOptimizeExisting = async (ringtone: Ringtone) => {
+    try {
+      setOptimizingId(ringtone.id);
+
+      const response = await fetch(ringtone.fileUrl);
+      if (!response.ok) {
+        throw new Error('Erreur lors du téléchargement de la sonnerie à optimiser');
+      }
+
+      const originalBlob = await response.blob();
+      const { optimizedBlob, durationSeconds } = await optimizeRingtone(originalBlob);
+
+      const extension = ringtone.format;
+      const safeMimeType = optimizedBlob.type || 'audio/wav';
+      const baseTitle = `${ringtone.title} (opt)`;
+      const sanitizedTitle = baseTitle.trim().replace(/[^a-zA-Z0-9_-]+/g, '_') || 'ringtone_opt';
+      const filename = `${sanitizedTitle}.${extension}`;
+      const file = new File([optimizedBlob], filename, { type: safeMimeType });
+
+      const rawDuration = Number.isFinite(durationSeconds)
+        ? durationSeconds
+        : ringtone.duration;
+      const clampedDuration = Math.max(1, Math.min(40, Math.round(rawDuration)));
+
+      await upload(file, baseTitle, extension, clampedDuration);
+      toast.success(`Version optimisée créée : ${baseTitle}`);
+      await fetchAll();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Impossible de créer la version optimisée';
+      toast.error(message);
+      console.error('Erreur lors de la création de la version optimisée:', error);
+    } finally {
+      setOptimizingId(null);
     }
   };
 
@@ -185,6 +224,15 @@ export const Dashboard = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
                     Enregistrer sur téléphone
+                  </Button>
+                  <Button
+                    onClick={() => handleOptimizeExisting(ringtone)}
+                    variant="secondary"
+                    className="flex-1 min-h-[44px]"
+                    isLoading={optimizingId === ringtone.id}
+                    disabled={optimizingId === ringtone.id}
+                  >
+                    ✨ Optimiser
                   </Button>
                   <Button
                     onClick={() => handleDelete(ringtone)}

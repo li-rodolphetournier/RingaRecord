@@ -4,6 +4,7 @@ import { toast } from 'react-toastify';
 import { useAuthStore } from '../stores/authStore';
 import { useRingtoneStore } from '../stores/ringtoneStore';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
+import { useSmartRingtone } from '../hooks/useSmartRingtone';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
@@ -18,6 +19,8 @@ export const Record = () => {
   const [title, setTitle] = useState('');
   const [gain, setGain] = useState(2.0); // Gain par défaut : 2x (double le volume)
   const [recordingMode, setRecordingMode] = useState<RecordingMode>('microphone');
+  const [lastOriginalBlob, setLastOriginalBlob] = useState<Blob | null>(null);
+  const [useOptimizedVersion, setUseOptimizedVersion] = useState<boolean>(true);
   
   // Détecter le support navigateur
   const browserSupport = useMemo(() => getBrowserSupport(), []);
@@ -46,6 +49,13 @@ export const Record = () => {
     getAudioBlob,
     error: recorderError,
   } = useAudioRecorder({ gain, mode: recordingMode });
+
+  const {
+    isOptimizing,
+    optimizedBlob,
+    error: smartError,
+    optimize,
+  } = useSmartRingtone();
 
   const getBlobDuration = async (blob: Blob): Promise<number | null> => {
     try {
@@ -100,6 +110,12 @@ export const Record = () => {
     }
   }, [recorderError]);
 
+  useEffect(() => {
+    if (smartError) {
+      toast.error(smartError);
+    }
+  }, [smartError]);
+
   const handleStart = async () => {
     try {
       await startRecording();
@@ -116,28 +132,49 @@ export const Record = () => {
     stopRecording();
   };
 
+  const handleOptimize = async () => {
+    const originalBlob = getAudioBlob();
+    if (!originalBlob) {
+      toast.error('Aucun enregistrement disponible pour optimisation');
+      return;
+    }
+
+    setLastOriginalBlob(originalBlob);
+    try {
+      await optimize(originalBlob);
+      setUseOptimizedVersion(true);
+      toast.success('Sonnerie optimisée ✔️');
+    } catch {
+      // L'erreur est déjà gérée dans le hook via smartError
+    }
+  };
+
   const handleSave = async () => {
     if (!title.trim()) {
       toast.error('Veuillez entrer un titre');
       return;
     }
 
-    const audioBlob = getAudioBlob();
-    if (!audioBlob) {
+    const baseBlob =
+      useOptimizedVersion && optimizedBlob
+        ? optimizedBlob
+        : getAudioBlob();
+
+    if (!baseBlob) {
       toast.error('Aucun enregistrement disponible');
       return;
     }
 
     try {
-      // Créer un fichier à partir du blob
+      // Créer un fichier à partir du blob utilisé (original ou optimisé)
       const extension = fileExtension || 'm4a';
       const safeMimeType = recordingMimeType || 'audio/mp4';
       const sanitizedTitle = title.trim().replace(/[^a-zA-Z0-9_-]+/g, '_') || 'ringtone';
       const filename = `${sanitizedTitle}.${extension}`;
-      const file = new File([audioBlob], filename, { type: safeMimeType });
+      const file = new File([baseBlob], filename, { type: safeMimeType });
 
       // Calculer la durée réelle du fichier audio pour éviter les valeurs 0
-      const preciseDuration = await getBlobDuration(audioBlob);
+      const preciseDuration = await getBlobDuration(baseBlob);
       let finalDuration = preciseDuration ?? duration;
 
       // Validation stricte de la durée avant l'envoi
@@ -259,6 +296,90 @@ export const Record = () => {
                 💡 Augmente le volume d'enregistrement. Au-delà de 3.0x, risque de distorsion.
               </p>
             </div>
+
+            {/* Assistant Smart Ringtone */}
+            {!isRecording && duration > 0 && (
+              <div className="space-y-3 border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white/60 dark:bg-gray-800/60">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      Assistant Smart Ringtone
+                    </h2>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      Coupe les silences, normalise le volume et applique un fondu propre.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleOptimize}
+                    isLoading={isOptimizing}
+                    disabled={isOptimizing}
+                  >
+                    ✨ Optimiser
+                  </Button>
+                </div>
+
+                {(lastOriginalBlob || optimizedBlob) && (
+                  <>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                        Prévisualisation
+                      </span>
+                      <div className="inline-flex rounded-full bg-gray-100 dark:bg-gray-700 p-1">
+                        <button
+                          type="button"
+                          onClick={() => setUseOptimizedVersion(false)}
+                          className={`px-3 py-1 text-xs rounded-full ${
+                            !useOptimizedVersion
+                              ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow'
+                              : 'text-gray-500 dark:text-gray-300'
+                          }`}
+                        >
+                          Original
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!optimizedBlob) {
+                              toast.info('Clique sur ✨ Optimiser pour générer la version optimisée');
+                              return;
+                            }
+                            setUseOptimizedVersion(true);
+                          }}
+                          className={`px-3 py-1 text-xs rounded-full ${
+                            useOptimizedVersion
+                              ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow'
+                              : 'text-gray-500 dark:text-gray-300'
+                          }`}
+                        >
+                          Optimisée
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <audio
+                        controls
+                        className="w-full"
+                        src={
+                          useOptimizedVersion && optimizedBlob
+                            ? URL.createObjectURL(optimizedBlob)
+                            : lastOriginalBlob
+                              ? URL.createObjectURL(lastOriginalBlob)
+                              : undefined
+                        }
+                      />
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                        {useOptimizedVersion && optimizedBlob
+                          ? 'Lecture de la version optimisée (WAV normalisée avec fade).'
+                          : 'Lecture de la version originale brute.'}
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             <div className="text-center py-8">
               <div className="text-6xl font-mono mb-4 text-gray-900 dark:text-gray-100">
