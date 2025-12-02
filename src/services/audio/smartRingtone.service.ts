@@ -122,7 +122,8 @@ export async function optimizeRingtone(
     );
     const limited = limitDuration(withFades, mergedOptions.maxDurationSeconds);
 
-    const resultBlob = await renderToWavBlob(limited, audioContext.sampleRate);
+    const copyright = `© ${new Date().getFullYear()} RingaRecord. All rights reserved.`;
+    const resultBlob = await renderToWavBlob(limited, audioContext.sampleRate, copyright);
 
     return {
       optimizedBlob: resultBlob,
@@ -450,8 +451,86 @@ function cloneBuffer(audioBuffer: AudioBuffer): AudioBuffer {
   return cloned;
 }
 
-// Encode un AudioBuffer en WAV (PCM 16 bits)
-async function renderToWavBlob(audioBuffer: AudioBuffer, sampleRate: number): Promise<Blob> {
+/**
+ * Construit un chunk LIST/INFO avec métadonnées copyright
+ */
+function buildInfoChunk(copyright: string): ArrayBuffer {
+  // Format LIST/INFO :
+  // - 'LIST' (4 bytes)
+  // - Taille du chunk (4 bytes, little-endian)
+  // - 'INFO' (4 bytes)
+  // - Champs de métadonnées (chaque champ = ID (4 bytes) + Taille (4 bytes) + Données (padded à pair))
+
+  const fields: Array<{ id: string; value: string }> = [
+    { id: 'ICOP', value: copyright }, // Copyright
+    { id: 'ISFT', value: 'RingaRecord' }, // Software
+  ];
+
+  let chunkSize = 4; // 'INFO'
+
+  for (const field of fields) {
+    chunkSize += 4; // ID
+    chunkSize += 4; // Taille
+    const valueBytes = new TextEncoder().encode(field.value);
+    chunkSize += valueBytes.length;
+    // Padding à pair
+    if (valueBytes.length % 2 !== 0) {
+      chunkSize += 1;
+    }
+  }
+
+  const buffer = new ArrayBuffer(8 + chunkSize);
+  const view = new DataView(buffer);
+  let offset = 0;
+
+  // 'LIST'
+  view.setUint8(offset++, 'L'.charCodeAt(0));
+  view.setUint8(offset++, 'I'.charCodeAt(0));
+  view.setUint8(offset++, 'S'.charCodeAt(0));
+  view.setUint8(offset++, 'T'.charCodeAt(0));
+
+  // Taille du chunk
+  view.setUint32(offset, chunkSize, true);
+  offset += 4;
+
+  // 'INFO'
+  view.setUint8(offset++, 'I'.charCodeAt(0));
+  view.setUint8(offset++, 'N'.charCodeAt(0));
+  view.setUint8(offset++, 'F'.charCodeAt(0));
+  view.setUint8(offset++, 'O'.charCodeAt(0));
+
+  // Champs de métadonnées
+  for (const field of fields) {
+    // ID (4 bytes)
+    for (let i = 0; i < 4; i++) {
+      view.setUint8(offset++, field.id.charCodeAt(i));
+    }
+
+    // Taille (4 bytes, little-endian)
+    const valueBytes = new TextEncoder().encode(field.value);
+    view.setUint32(offset, valueBytes.length, true);
+    offset += 4;
+
+    // Données
+    for (let i = 0; i < valueBytes.length; i++) {
+      view.setUint8(offset++, valueBytes[i]);
+    }
+
+    // Padding à pair si nécessaire
+    if (valueBytes.length % 2 !== 0) {
+      view.setUint8(offset++, 0);
+    }
+  }
+
+  return buffer;
+}
+
+// Encode un AudioBuffer en WAV (PCM 16 bits) avec métadonnées copyright
+async function renderToWavBlob(
+  audioBuffer: AudioBuffer,
+  sampleRate: number,
+  copyright?: string,
+): Promise<Blob> {
   const numChannels = audioBuffer.numberOfChannels;
   const numSamples = audioBuffer.length;
 
@@ -459,7 +538,16 @@ async function renderToWavBlob(audioBuffer: AudioBuffer, sampleRate: number): Pr
   const blockAlign = numChannels * bytesPerSample;
   const byteRate = sampleRate * blockAlign;
   const dataSize = numSamples * blockAlign;
-  const buffer = new ArrayBuffer(44 + dataSize);
+
+  // Construire le chunk LIST/INFO pour les métadonnées
+  const copyrightText =
+    copyright || `© ${new Date().getFullYear()} RingaRecord. All rights reserved.`;
+  const infoChunk = buildInfoChunk(copyrightText);
+  const infoChunkSize = infoChunk.byteLength;
+
+  // Taille totale = RIFF header (12) + fmt chunk (24) + LIST chunk + data chunk (8 + dataSize)
+  const totalSize = 12 + 24 + infoChunkSize + 8 + dataSize;
+  const buffer = new ArrayBuffer(44 + infoChunkSize + dataSize);
   const view = new DataView(buffer);
 
   const writeString = (offset: number, str: string) => {
@@ -468,26 +556,48 @@ async function renderToWavBlob(audioBuffer: AudioBuffer, sampleRate: number): Pr
     }
   };
 
+  let offset = 0;
+
   // RIFF header
-  writeString(0, 'RIFF');
-  view.setUint32(4, 36 + dataSize, true);
-  writeString(8, 'WAVE');
+  writeString(offset, 'RIFF');
+  offset += 4;
+  view.setUint32(offset, totalSize - 8, true); // Taille du fichier - 8
+  offset += 4;
+  writeString(offset, 'WAVE');
+  offset += 4;
 
   // fmt chunk
-  writeString(12, 'fmt ');
-  view.setUint32(16, 16, true); // Subchunk1Size
-  view.setUint16(20, 1, true); // AudioFormat (1 = PCM)
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, byteRate, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, bytesPerSample * 8, true); // bits per sample
+  writeString(offset, 'fmt ');
+  offset += 4;
+  view.setUint32(offset, 16, true); // Subchunk1Size
+  offset += 4;
+  view.setUint16(offset, 1, true); // AudioFormat (1 = PCM)
+  offset += 2;
+  view.setUint16(offset, numChannels, true);
+  offset += 2;
+  view.setUint32(offset, sampleRate, true);
+  offset += 4;
+  view.setUint32(offset, byteRate, true);
+  offset += 4;
+  view.setUint16(offset, blockAlign, true);
+  offset += 2;
+  view.setUint16(offset, bytesPerSample * 8, true); // bits per sample
+  offset += 2;
+
+  // LIST chunk avec INFO
+  const infoChunkView = new Uint8Array(infoChunk);
+  for (let i = 0; i < infoChunkSize; i++) {
+    view.setUint8(offset + i, infoChunkView[i]);
+  }
+  offset += infoChunkSize;
 
   // data chunk
-  writeString(36, 'data');
-  view.setUint32(40, dataSize, true);
+  writeString(offset, 'data');
+  offset += 4;
+  view.setUint32(offset, dataSize, true);
+  offset += 4;
 
-  let offset = 44;
+  // Écrire les données audio
   const channelData: Float32Array[] = [];
   for (let channel = 0; channel < numChannels; channel++) {
     channelData[channel] = audioBuffer.getChannelData(channel);

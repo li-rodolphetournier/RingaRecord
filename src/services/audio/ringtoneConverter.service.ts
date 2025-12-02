@@ -242,4 +242,3 @@ function encodeToWAV(audioBuffer: AudioBuffer): Blob {
 
   return new Blob([buffer], { type: 'audio/wav' });
 }
-
