@@ -11,7 +11,7 @@ export interface UseSegmentPreviewOptions {
 }
 
 export interface UseSegmentPreviewReturn {
-  audioRef: React.RefObject<HTMLAudioElement>;
+  audioRef: React.RefObject<HTMLAudioElement | null>;
   activeSegmentId: number | null;
   playSegment: (segmentId: number) => void;
   stop: () => void;
