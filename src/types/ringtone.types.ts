@@ -8,6 +8,7 @@ export interface Ringtone {
   fileUrl: string;
   waveform?: Record<string, unknown> | null;
   syncedAt?: string | null;
+  isProtected: boolean;
   createdAt: string;
   user?: {
     id: string;
@@ -26,5 +27,6 @@ export interface CreateRingtoneDto {
 
 export interface UpdateRingtoneDto {
   title?: string;
+  isProtected?: boolean;
 }
 

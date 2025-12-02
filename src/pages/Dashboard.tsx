@@ -292,7 +292,32 @@ export const Dashboard = () => {
     }
   };
 
+  const handleToggleProtection = async (ringtone: Ringtone) => {
+    try {
+      await updateRingtone(ringtone.id, { isProtected: !ringtone.isProtected });
+      toast.success(
+        ringtone.isProtected
+          ? 'Protection désactivée'
+          : 'Sonnerie protégée contre la suppression ⭐',
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Impossible de modifier la protection';
+      toast.error(message);
+    }
+  };
+
   const handleDelete = (ringtone: Ringtone) => {
+    if (ringtone.isProtected) {
+      toast.warning(
+        'Cette sonnerie est protégée. Désactivez la protection (⭐) avant de pouvoir la supprimer.',
+        {
+          autoClose: 5000,
+        },
+      );
+      return;
+    }
+
     toast.info(({ closeToast }) => (
       <div className="space-y-3">
         <p className="font-semibold text-gray-900 dark:text-gray-100">
@@ -394,9 +419,40 @@ export const Dashboard = () => {
                       </div>
                     </div>
                   ) : (
-                    <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">
-                      {ringtone.title}
-                    </h3>
+                    <div className="flex items-center gap-2 flex-1">
+                      <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">
+                        {ringtone.title}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleProtection(ringtone)}
+                        className={`flex-shrink-0 transition-colors min-h-[28px] min-w-[28px] flex items-center justify-center rounded-full ${
+                          ringtone.isProtected
+                            ? 'text-yellow-500 hover:text-yellow-600 dark:text-yellow-400 dark:hover:text-yellow-300'
+                            : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
+                        }`}
+                        title={
+                          ringtone.isProtected
+                            ? 'Protégée - Cliquez pour désactiver la protection'
+                            : 'Non protégée - Cliquez pour activer la protection'
+                        }
+                      >
+                        <svg
+                          className="w-5 h-5"
+                          fill={ringtone.isProtected ? 'currentColor' : 'none'}
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                          xmlns="http://www.w3.org/2000/svg"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+                          />
+                        </svg>
+                      </button>
+                    </div>
                   )}
                   {editingTitleId !== ringtone.id && (
                     <button
@@ -454,11 +510,17 @@ export const Dashboard = () => {
                       onClick={() => handleDelete(ringtone)}
                       variant="danger"
                       className="flex-1 min-h-[40px] text-xs !rounded-xl px-3 py-2"
+                      disabled={ringtone.isProtected}
+                      title={
+                        ringtone.isProtected
+                          ? 'Désactivez la protection (⭐) pour supprimer'
+                          : 'Supprimer la sonnerie'
+                      }
                     >
                       <svg className="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
-                      Supprimer
+                      {ringtone.isProtected ? 'Protégée' : 'Supprimer'}
                     </Button>
                   </div>
 

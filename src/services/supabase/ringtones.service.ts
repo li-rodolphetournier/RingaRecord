@@ -23,6 +23,7 @@ export const supabaseRingtonesService = {
       fileUrl: ringtone.file_url,
       waveform: ringtone.waveform,
       syncedAt: ringtone.synced_at,
+      isProtected: ringtone.is_protected ?? false,
       createdAt: ringtone.created_at,
     }));
   },
@@ -48,6 +49,7 @@ export const supabaseRingtonesService = {
       fileUrl: data.file_url,
       waveform: data.waveform,
       syncedAt: data.synced_at,
+      isProtected: data.is_protected ?? false,
       createdAt: data.created_at,
     };
   },
@@ -86,16 +88,23 @@ export const supabaseRingtonesService = {
       fileUrl: data.file_url,
       waveform: data.waveform,
       syncedAt: data.synced_at,
+      isProtected: data.is_protected ?? false,
       createdAt: data.created_at,
     };
   },
 
   async update(id: string, dto: UpdateRingtoneDto): Promise<Ringtone> {
+    const updateData: Record<string, unknown> = {};
+    if (dto.title !== undefined) {
+      updateData.title = dto.title;
+    }
+    if (dto.isProtected !== undefined) {
+      updateData.is_protected = dto.isProtected;
+    }
+
     const { data, error } = await supabase
       .from('ringtones')
-      .update({
-        title: dto.title,
-      })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
@@ -114,20 +123,25 @@ export const supabaseRingtonesService = {
       fileUrl: data.file_url,
       waveform: data.waveform,
       syncedAt: data.synced_at,
+      isProtected: data.is_protected ?? false,
       createdAt: data.created_at,
     };
   },
 
   async delete(id: string): Promise<void> {
-    // Récupérer l'URL du fichier avant suppression
+    // Vérifier si la sonnerie est protégée avant suppression
     const { data: ringtone, error: fetchError } = await supabase
       .from('ringtones')
-      .select('file_url')
+      .select('file_url, is_protected')
       .eq('id', id)
       .single();
 
     if (fetchError) {
       throw new Error(`Failed to find ringtone: ${fetchError.message}`);
+    }
+
+    if (ringtone?.is_protected) {
+      throw new Error('Cette sonnerie est protégée et ne peut pas être supprimée. Désactivez la protection d\'abord.');
     }
 
     const fileUrl = ringtone?.file_url as string | undefined;
