@@ -30,16 +30,22 @@ npm run dev
 ```
 src/
 ├── components/                 # UI + audio player
-├── hooks/                      # useAudioRecorder, useSmartRingtone, useSegmentPreview
+│   ├── audio/                  # AudioPlayer, Equalizer
+│   └── ui/                     # Button, Card, Input
+├── hooks/                      # useAudioRecorder, useSmartRingtone, useSegmentPreview, useEqualizer, useBPMDetection
 ├── services/
-│   ├── audio/                  # smartRingtone + découpe multi-segments
+│   ├── audio/                  # smartRingtone, equalizer, bpmDetection, spectralAnalysis, ringtoneSegments
 │   └── supabase/               # client + auth + ringtones services
 ├── stores/                     # Zustand stores (auth, ringtones)
 ├── pages/                      # Login / Register / Dashboard / Record
-└── types/                      # Types partagés
+├── types/                      # Types partagés (ringtone, equalizer, bpm)
+└── test/                       # Setup Vitest
 
 supabase/
 ├── migrations/           # SQL à exécuter dans Supabase
+│   ├── 001_create_ringtones_table.sql
+│   ├── 002_create_storage_bucket.sql
+│   └── 003_add_is_protected_column.sql  # Migration pour protection
 └── README.md             # Rappels de configuration
 ```
 
@@ -71,9 +77,32 @@ supabase/
     - 1 segment coché → **1 sonnerie**.
     - plusieurs segments cochés → **une sonnerie par segment sélectionné**.
 
+- **🎚️ Égaliseur Audio avec Presets Intelligents** *(Nouveau)*
+  - **Analyse spectrale automatique** : bouton "🔍 Analyser" pour analyser le spectre audio et suggérer le meilleur preset.
+  - **4 presets prédéfinis** :
+    - **Bass Boost** : Renforce les basses pour plus de profondeur
+    - **Vocal Clarity** : Améliore la clarté des voix et paroles
+    - **Bright** : Éclaire les aigus pour plus de brillance
+    - **Warm** : Ajoute de la chaleur avec des médiums renforcés
+  - **Visualisation graphique** : courbe de réponse fréquentielle en temps réel (Canvas).
+  - **Application en un clic** : bouton "✨ Appliquer l'égalisation" pour traiter l'audio.
+  - Utilise Web Audio API `BiquadFilterNode` pour un traitement professionnel.
+
+- **🎵 Détection Automatique de BPM** *(Nouveau - Expérimental)*
+  - Bouton **"🎵 Détecter le BPM"** pour analyser le tempo de l'enregistrement.
+  - Détection automatique du BPM (60-200 BPM) avec score de confiance.
+  - Affichage du BPM détecté, de la méthode utilisée (autocorrélation) et du niveau de confiance.
+  - Préparation pour la synchronisation rythmique et création de boucles parfaites (à venir).
+
 ### Sur la page **Dashboard** (sonneries existantes)
 
 Pour chaque carte de sonnerie :
+
+- **⭐ Protection contre la suppression** *(Nouveau)*
+  - Étoile cliquable à côté du titre pour activer/désactiver la protection.
+  - Étoile **jaune** = sonnerie protégée, **grise** = non protégée.
+  - Les sonneries protégées ne peuvent pas être supprimées (bouton "Supprimer" désactivé).
+  - Message d'avertissement si tentative de suppression d'une sonnerie protégée.
 
 - **Renommage direct**
   - Bouton **"Renommer"** à côté du titre.
@@ -103,6 +132,13 @@ Pour chaque carte de sonnerie :
         - génère un nouveau Blob via le service audio (`buildRingtonesForSegments`),
         - crée une nouvelle entrée Supabase (titre `Titre (partie X)`).
 
+- **🎚️ Égaliseur Audio pour sonneries existantes** *(Nouveau)*
+  - Section **"Égaliseur Audio"** dans le panneau de découpe/optimisation.
+  - Bouton **"Ouvrir"** pour activer l'égaliseur sur une sonnerie existante.
+  - Analyse spectrale automatique au clic sur "Ouvrir".
+  - Même interface que pour les nouvelles sonneries (presets, visualisation, application).
+  - Crée une nouvelle sonnerie avec le suffixe "(égalisé)" après application.
+
 ## 🧪 Scripts
 
 | Commande        | Description                       |
@@ -111,6 +147,9 @@ Pour chaque carte de sonnerie :
 | `npm run build` | Compile TypeScript + bundle Vite  |
 | `npm run preview` | Prévisualise le build           |
 | `npm run lint`  | ESLint (config strict TypeScript) |
+| `npm run test`  | Lance les tests Vitest (mode watch) |
+| `npm run test:run` | Exécute les tests une fois |
+| `npm run test:ui` | Interface UI Vitest |
 
 ## 🔐 Sécurité
 
@@ -118,6 +157,33 @@ Pour chaque carte de sonnerie :
 - La **service role key** reste dans Supabase / coffre-fort (pas dans le dépôt).
 - RLS activé sur la table `ringtones`.
 - Bucket Storage `ringtones` en lecture publique, upload contrôlé par les policies.
+- **Protection des sonneries** : colonne `is_protected` pour empêcher la suppression accidentelle.
+
+## 🆕 Nouvelles Fonctionnalités
+
+### Version actuelle
+
+- ✅ **Égaliseur Audio avec Presets Intelligents**
+  - 4 presets prédéfinis (Bass Boost, Vocal Clarity, Bright, Warm)
+  - Analyse spectrale automatique pour suggestion de preset
+  - Visualisation graphique de la courbe de réponse fréquentielle
+  - Disponible sur nouvelles sonneries (Record) et sonneries existantes (Dashboard)
+
+- ✅ **Détection Automatique de BPM** (Expérimental)
+  - Détection du tempo (60-200 BPM) via autocorrélation
+  - Affichage du BPM avec score de confiance
+  - Préparation pour synchronisation rythmique et boucles parfaites
+
+- ✅ **Mode Protection avec Étoile**
+  - Protection contre la suppression accidentelle
+  - Étoile jaune/gris pour activation/désactivation
+  - Blocage de la suppression pour sonneries protégées
+
+### À venir
+
+- 🔄 Synchronisation rythmique et création de boucles parfaites
+- 🎨 Visualiseur de waveform interactif
+- 📊 Statistiques d'utilisation
 
 ## 📱 Distribution mobile
 
