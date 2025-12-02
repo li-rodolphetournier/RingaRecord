@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { MouseEvent } from 'react';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import {
@@ -34,24 +35,24 @@ export const ShareModal = ({ isOpen, onClose, shareUrl, title, description }: Sh
   };
 
   const handleShare = async (platform: string) => {
-    let shareUrl = '';
+    let platformUrl = '';
 
     switch (platform) {
       case 'facebook':
-        shareUrl = getFacebookShareUrl(shareOptions);
+        platformUrl = getFacebookShareUrl(shareOptions);
         break;
       case 'twitter':
-        shareUrl = getTwitterShareUrl(shareOptions);
+        platformUrl = getTwitterShareUrl(shareOptions);
         break;
       case 'whatsapp':
-        shareUrl = getWhatsAppShareUrl(shareOptions);
+        platformUrl = getWhatsAppShareUrl(shareOptions);
         break;
       case 'linkedin':
-        shareUrl = getLinkedInShareUrl(shareOptions);
+        platformUrl = getLinkedInShareUrl(shareOptions);
         break;
       case 'email':
-        shareUrl = getEmailShareUrl(shareOptions);
-        window.location.href = shareUrl;
+        platformUrl = getEmailShareUrl(shareOptions);
+        window.location.href = platformUrl;
         return;
       case 'native':
         const shared = await shareNative(shareOptions);
@@ -60,7 +61,7 @@ export const ShareModal = ({ isOpen, onClose, shareUrl, title, description }: Sh
         }
         return;
       case 'copy':
-        const success = await copyToClipboard(shareUrl);
+        const success = await copyToClipboard(shareOptions.url);
         if (success) {
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
@@ -70,8 +71,8 @@ export const ShareModal = ({ isOpen, onClose, shareUrl, title, description }: Sh
         return;
     }
 
-    if (shareUrl) {
-      window.open(shareUrl, '_blank', 'width=600,height=400');
+    if (platformUrl) {
+      window.open(platformUrl, '_blank', 'width=600,height=400');
     }
   };
 
@@ -142,10 +143,8 @@ export const ShareModal = ({ isOpen, onClose, shareUrl, title, description }: Sh
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
       onClick={onClose}
     >
-      <Card
-        className="w-full max-w-md mx-4 p-6 bg-white dark:bg-gray-800"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div onClick={(e: MouseEvent<HTMLDivElement>) => e.stopPropagation()}>
+        <Card className="w-full max-w-md mx-4 p-6 bg-white dark:bg-gray-800">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Partager la sonnerie</h2>
           <button
@@ -200,7 +199,7 @@ export const ShareModal = ({ isOpen, onClose, shareUrl, title, description }: Sh
           ))}
         </div>
 
-        {navigator.share && (
+        {typeof navigator.share === 'function' && (
           <Button
             variant="primary"
             onClick={() => handleShare('native')}
@@ -217,7 +216,8 @@ export const ShareModal = ({ isOpen, onClose, shareUrl, title, description }: Sh
             Partager via l'appareil
           </Button>
         )}
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 };

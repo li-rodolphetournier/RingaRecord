@@ -38,6 +38,8 @@ export const Dashboard = () => {
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [editingTitleValue, setEditingTitleValue] = useState<string>('');
   const [viewMode, setViewMode] = useState<'block' | 'landscape'>('block');
+  const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [shareRingtone, setShareRingtone] = useState<Ringtone | null>(null);
 
   const {
     isOptimizing: isSmartOptimizing,
@@ -367,6 +369,16 @@ export const Dashboard = () => {
     });
   };
 
+  const handleShare = (ringtone: Ringtone) => {
+    setShareRingtone(ringtone);
+    setShareModalOpen(true);
+  };
+
+  const handleCloseShareModal = () => {
+    setShareModalOpen(false);
+    setShareRingtone(null);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <header className="bg-white dark:bg-gray-800 shadow-sm">
@@ -587,6 +599,17 @@ export const Dashboard = () => {
                             className="flex-1 min-h-[36px] text-[11px] !rounded-xl px-2 py-1.5 min-w-0"
                           >
                             <span className="truncate">✂️ Découper</span>
+                          </Button>
+                          <Button
+                            onClick={() => handleShare(ringtone)}
+                            variant="secondary"
+                            className="flex-1 min-h-[36px] text-[11px] !rounded-xl px-2 py-1.5 min-w-0"
+                            title="Partager la sonnerie"
+                          >
+                            <svg className="w-4 h-4 inline mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                            </svg>
+                            <span className="truncate">Partager</span>
                           </Button>
                           <Button
                             onClick={() => handleDelete(ringtone)}
@@ -1017,12 +1040,23 @@ export const Dashboard = () => {
                       }}
                       variant="secondary"
                           className="flex-1 min-h-[36px] text-[11px] !rounded-xl px-2 py-1.5 min-w-0"
-                    >
+                  >
                           <span className="truncate">✂️ Découper</span>
-                    </Button>
-                    <Button
-                      onClick={() => handleDelete(ringtone)}
-                      variant="danger"
+                  </Button>
+                  <Button
+                    onClick={() => handleShare(ringtone)}
+                    variant="secondary"
+                    className="flex-1 min-h-[36px] text-[11px] !rounded-xl px-2 py-1.5 min-w-0"
+                    title="Partager la sonnerie"
+                  >
+                    <svg className="w-4 h-4 inline mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                    <span className="truncate">Partager</span>
+                  </Button>
+                  <Button
+                    onClick={() => handleDelete(ringtone)}
+                    variant="danger"
                           className="flex-1 min-h-[36px] text-[11px] !rounded-xl px-2 py-1.5 min-w-0"
                           disabled={ringtone.isProtected}
                           title={
@@ -1032,11 +1066,11 @@ export const Dashboard = () => {
                           }
                         >
                           <svg className="w-4 h-4 inline mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                           <span className="truncate">{ringtone.isProtected ? 'Protégée' : 'Supprimer'}</span>
-                    </Button>
-                  </div>
+                        </Button>
+                      </div>
 
                   {trimRingtoneId === ringtone.id && ringtone.duration > 1 && (
                     <div className="space-y-3 border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-white/60 dark:bg-gray-800/60">
@@ -1298,6 +1332,15 @@ export const Dashboard = () => {
           </div>
         )}
       </main>
+      {shareRingtone && (
+        <ShareModal
+          isOpen={shareModalOpen}
+          onClose={handleCloseShareModal}
+          shareUrl={shareRingtone.fileUrl}
+          title={shareRingtone.title}
+          description={`Découvrez la sonnerie "${shareRingtone.title}" créée avec RingaRecord!`}
+        />
+      )}
     </div>
   );
 };
