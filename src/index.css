@@ -3,7 +3,70 @@
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100;
+  :root {
+    /* Palette MyBrand.tools - mode clair */
+    --bg: #ffffff;
+    --bg-secondary: #f7f7f7;
+    --primary: #3fa7d6;
+    --secondary: #094074;
+    --tertiary: #ee6352;
+    --text: #1d1111;
   }
+
+  .dark {
+    /* Palette MyBrand.tools - mode sombre (dérivée du lien donné) */
+    --bg: #2a2b2e;
+    --bg-secondary: #343438;
+    --primary: #3fa7d6;
+    --secondary: #094074;
+    --tertiary: #ee6352;
+    --text: #ffffff;
+  }
+
+  body {
+    @apply text-base;
+    background-color: var(--bg);
+    color: var(--text);
+  }
+}
+
+/* Slider Tailwind classique, uni (bleu) */
+.range-default {
+  @apply w-full h-2 rounded-full cursor-pointer appearance-none;
+  background-color: rgba(37, 99, 235, 0.25);
+}
+
+/* WebKit */
+.range-default::-webkit-slider-runnable-track {
+  height: 0.5rem;
+  border-radius: 9999px;
+  background-color: rgba(37, 99, 235, 0.25);
+}
+
+.range-default::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 1rem;
+  width: 1rem;
+  border-radius: 9999px;
+  background-color: #2563eb;
+  box-shadow: 0 0 0 2px white;
+  border: none;
+  margin-top: -0.25rem; /* Remonte légèrement le bouton pour qu'il soit centré sur la piste */
+}
+
+/* Firefox */
+.range-default::-moz-range-track {
+  height: 0.5rem;
+  border-radius: 9999px;
+  background-color: rgba(37, 99, 235, 0.25);
+}
+
+.range-default::-moz-range-thumb {
+  height: 1rem;
+  width: 1rem;
+  border-radius: 9999px;
+  background-color: #2563eb;
+  box-shadow: 0 0 0 2px white;
+  border: none;
 }

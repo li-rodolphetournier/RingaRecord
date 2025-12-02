@@ -421,7 +421,13 @@ export const Record = () => {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Volume d'enregistrement: {gain.toFixed(1)}x
                 <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                  ({gain === 1.0 ? 'Normal' : gain < 2.0 ? 'Léger boost' : gain < 3.0 ? 'Boost moyen' : 'Boost fort'})
+                  {gain === 1.0
+                    ? 'Normal'
+                    : gain < 2.0
+                      ? 'Léger boost'
+                      : gain < 3.0
+                        ? 'Boost moyen'
+                        : 'Boost fort'}
                 </span>
               </label>
               <input
@@ -432,7 +438,7 @@ export const Record = () => {
                 value={gain}
                 onChange={(e) => setGain(parseFloat(e.target.value))}
                 disabled={isRecording}
-                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600"
+                className="range-default"
               />
               <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
                 <span>1.0x (Normal)</span>
@@ -510,7 +516,7 @@ export const Record = () => {
                             const next = parseFloat(e.target.value);
                             setTrimStart(Math.min(next, Math.max(0, (trimEnd || duration) - 1)));
                           }}
-                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600"
+                          className="range-default"
                         />
                       </div>
 
@@ -528,7 +534,7 @@ export const Record = () => {
                             const next = parseFloat(e.target.value);
                             setTrimEnd(Math.max(next, trimStart + 1));
                           }}
-                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600"
+                          className="range-default"
                         />
                       </div>
 
@@ -556,7 +562,7 @@ export const Record = () => {
                         step={1}
                         value={silenceThresholdDb}
                         onChange={(e) => setSilenceThresholdDb(parseInt(e.target.value, 10))}
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600"
+                        className="range-default"
                       />
                       <div className="flex justify-between text-[11px] text-gray-500 dark:text-gray-400">
                         <span>-60 dB (très sensible)</span>
@@ -578,7 +584,7 @@ export const Record = () => {
                         step={50}
                         value={minSilenceDurationMs}
                         onChange={(e) => setMinSilenceDurationMs(parseInt(e.target.value, 10))}
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600"
+                        className="range-default"
                       />
                       <div className="flex justify-between text-[11px] text-gray-500 dark:text-gray-400">
                         <span>100 ms (coupes fréquentes)</span>

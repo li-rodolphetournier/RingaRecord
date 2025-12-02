@@ -108,10 +108,7 @@ export const AudioPlayer = ({ src, title, className = '' }: AudioPlayerProps) =>
             max={duration || 0}
             value={currentTime}
             onChange={handleSeek}
-            className="w-full h-3 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600 touch-manipulation"
-            style={{
-              background: `linear-gradient(to right, #2563eb 0%, #2563eb ${duration ? (currentTime / duration) * 100 : 0}%, #e5e7eb ${duration ? (currentTime / duration) * 100 : 0}%, #e5e7eb 100%)`,
-            }}
+            className="range-default touch-manipulation"
           />
           <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mt-1">
             <span>{formatTime(currentTime)}</span>
@@ -131,7 +128,7 @@ export const AudioPlayer = ({ src, title, className = '' }: AudioPlayerProps) =>
           step="0.01"
           value={volume}
           onChange={handleVolumeChange}
-          className="flex-1 h-1 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-600"
+          className="flex-1 range-default"
         />
         <span className="text-xs text-gray-600 dark:text-gray-400 w-8">
           {Math.round(volume * 100)}%

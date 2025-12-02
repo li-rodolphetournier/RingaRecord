@@ -428,7 +428,7 @@ export const Dashboard = () => {
                     <Button
                       onClick={() => handleDownload(ringtone)}
                       variant="primary"
-                      className="flex-1 min-h-[44px]"
+                      className="flex-1 min-h-[40px] text-xs !rounded-xl px-3 py-2"
                     >
                       <svg className="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -446,14 +446,14 @@ export const Dashboard = () => {
                         }
                       }}
                       variant="secondary"
-                      className="flex-1 min-h-[44px]"
+                      className="flex-1 min-h-[40px] text-xs !rounded-xl px-3 py-2"
                     >
                       ✂️ Découper / optimiser
                     </Button>
                     <Button
                       onClick={() => handleDelete(ringtone)}
                       variant="danger"
-                      className="flex-1 min-h-[44px]"
+                      className="flex-1 min-h-[40px] text-xs !rounded-xl px-3 py-2"
                     >
                       <svg className="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -487,14 +487,14 @@ export const Dashboard = () => {
                             min={0}
                             max={Math.max(1, ringtone.duration - 1)}
                             step={0.1}
-                            value={trimStart}
+                          value={trimStart}
                             onChange={(e) => {
                               const next = parseFloat(e.target.value);
                               setTrimStart(
                                 Math.min(next, Math.max(0, (trimEnd || ringtone.duration) - 1)),
                               );
                             }}
-                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600"
+                          className="range-default"
                           />
                         </div>
 
@@ -507,12 +507,12 @@ export const Dashboard = () => {
                             min={Math.min(ringtone.duration - 1, trimStart + 1)}
                             max={ringtone.duration}
                             step={0.1}
-                            value={trimEnd || ringtone.duration}
+                          value={trimEnd || ringtone.duration}
                             onChange={(e) => {
                               const next = parseFloat(e.target.value);
                               setTrimEnd(Math.max(next, trimStart + 1));
                             }}
-                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600"
+                          className="range-default"
                           />
                         </div>
 
@@ -563,9 +563,9 @@ export const Dashboard = () => {
                             min={-60}
                             max={-10}
                             step={1}
-                            value={silenceThresholdDb}
+                          value={silenceThresholdDb}
                             onChange={(e) => setSilenceThresholdDb(parseInt(e.target.value, 10))}
-                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600"
+                          className="range-default"
                           />
                           <div className="flex justify-between text-[11px] text-gray-500 dark:text-gray-400">
                             <span>-60 dB (très sensible)</span>
@@ -585,9 +585,9 @@ export const Dashboard = () => {
                             min={100}
                             max={1000}
                             step={50}
-                            value={minSilenceDurationMs}
+                          value={minSilenceDurationMs}
                             onChange={(e) => setMinSilenceDurationMs(parseInt(e.target.value, 10))}
-                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600"
+                          className="range-default"
                           />
                           <div className="flex justify-between text-[11px] text-gray-500 dark:text-gray-400">
                             <span>100 ms (coupes fréquentes)</span>
