@@ -11,12 +11,29 @@ export interface SmartRingtoneOptions {
   manualStartSeconds?: number;
   /** Fin manuelle de la découpe (en secondes). Doit être > manualStartSeconds. */
   manualEndSeconds?: number;
+  /** Seuil de volume (en dB, valeur négative) pour considérer qu'une zone est silencieuse. */
+  silenceThresholdDb?: number;
+  /** Durée minimale (en millisecondes) pendant laquelle le signal doit être silencieux pour créer une séparation. */
+  minSilenceDurationMs?: number;
+}
+
+export interface SmartRingtoneSegment {
+  /** Identifiant simple (1, 2, 3, ...) pour l'affichage. */
+  id: number;
+  /** Début du segment en secondes (par rapport à l'audio original complet). */
+  startSeconds: number;
+  /** Fin du segment en secondes (par rapport à l'audio original complet). */
+  endSeconds: number;
+  /** Durée du segment en secondes. */
+  durationSeconds: number;
 }
 
 export interface SmartRingtoneResult {
   optimizedBlob: Blob;
   /** Durée en secondes de l'audio optimisé. */
   durationSeconds: number;
+  /** Segments détectés sur l'audio original (pour UI multi-parties). */
+  segments: SmartRingtoneSegment[];
 }
 
 interface InternalSmartOptions {
@@ -26,6 +43,8 @@ interface InternalSmartOptions {
   maxDurationSeconds: number;
   manualStartSeconds?: number;
   manualEndSeconds?: number;
+  silenceThresholdDb: number;
+  minSilenceDurationMs: number;
 }
 
 const DEFAULT_OPTIONS: InternalSmartOptions = {
@@ -33,6 +52,8 @@ const DEFAULT_OPTIONS: InternalSmartOptions = {
   fadeInSeconds: 0.15,
   fadeOutSeconds: 0.3,
   maxDurationSeconds: 40,
+  silenceThresholdDb: -40,
+  minSilenceDurationMs: 200,
 };
 
 /**
@@ -68,6 +89,12 @@ export async function optimizeRingtone(
   try {
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
 
+    const segments = detectSegments(
+      audioBuffer,
+      mergedOptions.silenceThresholdDb,
+      mergedOptions.minSilenceDurationMs,
+    );
+
     const hasManualRange =
       typeof mergedOptions.manualStartSeconds === 'number' &&
       typeof mergedOptions.manualEndSeconds === 'number' &&
@@ -79,7 +106,9 @@ export async function optimizeRingtone(
           mergedOptions.manualStartSeconds as number,
           mergedOptions.manualEndSeconds as number,
         )
-      : trimSilence(audioBuffer);
+      : segments.length > 0
+        ? trimToRange(audioBuffer, segments[0].startSeconds, segments[0].endSeconds)
+        : trimSilence(audioBuffer);
 
     if (!baseBuffer) {
       throw new Error("Impossible de détecter un son utile dans l'enregistrement.");
@@ -98,6 +127,7 @@ export async function optimizeRingtone(
     return {
       optimizedBlob: resultBlob,
       durationSeconds: limited.duration,
+      segments,
     };
   } finally {
     await audioContext.close();
@@ -176,6 +206,104 @@ function trimSilence(audioBuffer: AudioBuffer): AudioBuffer | null {
   }
 
   return trimmedBuffer;
+}
+
+function dbToAmplitude(db: number): number {
+  // db est négatif, on renvoie une amplitude dans [0, 1]
+  const amp = 10 ** (db / 20);
+  if (!Number.isFinite(amp) || amp <= 0) {
+    return 0.0001;
+  }
+  return Math.min(Math.max(amp, 0.000001), 1);
+}
+
+function detectSegments(
+  audioBuffer: AudioBuffer,
+  silenceThresholdDb: number,
+  minSilenceDurationMs: number,
+): SmartRingtoneSegment[] {
+  const channelData = audioBuffer.getChannelData(0);
+  const length = channelData.length;
+
+  if (length === 0) {
+    return [];
+  }
+
+  const sampleRate = audioBuffer.sampleRate;
+  const windowDurationMs = 20;
+  const windowSize = Math.max(128, Math.floor((sampleRate * windowDurationMs) / 1000));
+  const silenceThresholdAmp = dbToAmplitude(silenceThresholdDb);
+  const totalWindows = Math.ceil(length / windowSize);
+  const minSilentWindows = Math.max(1, Math.floor(minSilenceDurationMs / windowDurationMs));
+
+  const windowIsSilent: boolean[] = new Array(totalWindows);
+
+  for (let w = 0; w < totalWindows; w++) {
+    const start = w * windowSize;
+    const end = Math.min(start + windowSize, length);
+    let maxAmplitude = 0;
+    for (let i = start; i < end; i++) {
+      const sample = Math.abs(channelData[i]);
+      if (sample > maxAmplitude) {
+        maxAmplitude = sample;
+      }
+    }
+    windowIsSilent[w] = maxAmplitude < silenceThresholdAmp;
+  }
+
+  const segments: SmartRingtoneSegment[] = [];
+
+  let currentSegmentStartWindow: number | null = null;
+  let silentStreak = 0;
+
+  const flushSegment = (endWindowExclusive: number) => {
+    if (currentSegmentStartWindow === null) {
+      return;
+    }
+    const startSample = currentSegmentStartWindow * windowSize;
+    const endSample = Math.min(endWindowExclusive * windowSize, length);
+    if (endSample <= startSample) {
+      currentSegmentStartWindow = null;
+      return;
+    }
+    const startSeconds = startSample / sampleRate;
+    const endSeconds = endSample / sampleRate;
+    const durationSeconds = endSeconds - startSeconds;
+    if (durationSeconds <= 0.05) {
+      // On ignore les segments ultra courts
+      currentSegmentStartWindow = null;
+      return;
+    }
+    const id = segments.length + 1;
+    segments.push({
+      id,
+      startSeconds,
+      endSeconds,
+      durationSeconds,
+    });
+    currentSegmentStartWindow = null;
+  };
+
+  for (let w = 0; w < totalWindows; w++) {
+    if (windowIsSilent[w]) {
+      silentStreak += 1;
+      if (silentStreak >= minSilentWindows) {
+        const silentStartWindow = w - silentStreak + 1;
+        flushSegment(silentStartWindow);
+      }
+    } else {
+      if (currentSegmentStartWindow === null) {
+        currentSegmentStartWindow = w;
+      }
+      silentStreak = 0;
+    }
+  }
+
+  if (currentSegmentStartWindow !== null) {
+    flushSegment(totalWindows);
+  }
+
+  return segments;
 }
 
 function trimToRange(

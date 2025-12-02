@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '../stores/authStore';
 import { useRingtoneStore } from '../stores/ringtoneStore';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useSmartRingtone } from '../hooks/useSmartRingtone';
+import { buildRingtonesForSegments } from '../services/audio/ringtoneSegments.service';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
@@ -24,21 +25,9 @@ export const Record = () => {
   const [useManualTrim, setUseManualTrim] = useState<boolean>(false);
   const [trimStart, setTrimStart] = useState<number>(0);
   const [trimEnd, setTrimEnd] = useState<number>(0);
-  
-  // Détecter le support navigateur
-  const browserSupport = useMemo(() => getBrowserSupport(), []);
-  
-  // S'assurer que le mode sélectionné est supporté
-  useEffect(() => {
-    if (!isRecordingModeSupported(recordingMode)) {
-      // Si le mode système n'est pas supporté, basculer vers microphone
-      if (recordingMode === 'system') {
-        setRecordingMode('microphone');
-        toast.warning('Le mode son système n\'est pas disponible sur votre navigateur. Mode microphone activé.');
-      }
-    }
-  }, [recordingMode]);
-  
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [activeSegmentId, setActiveSegmentId] = useState<number | null>(null);
+
   const {
     isRecording,
     isPaused,
@@ -58,7 +47,28 @@ export const Record = () => {
     optimizedBlob,
     error: smartError,
     optimize,
+    segments,
+    silenceThresholdDb,
+    minSilenceDurationMs,
+    selectedSegmentIds,
+    setSilenceThresholdDb,
+    setMinSilenceDurationMs,
+    toggleSegmentSelection,
   } = useSmartRingtone();
+
+  // Détecter le support navigateur
+  const browserSupport = useMemo(() => getBrowserSupport(), []);
+  
+  // S'assurer que le mode sélectionné est supporté
+  useEffect(() => {
+    if (!isRecordingModeSupported(recordingMode)) {
+      // Si le mode système n'est pas supporté, basculer vers microphone
+      if (recordingMode === 'system') {
+        setRecordingMode('microphone');
+        toast.warning('Le mode son système n\'est pas disponible sur votre navigateur. Mode microphone activé.');
+      }
+    }
+  }, [recordingMode]);
 
   const getBlobDuration = async (blob: Blob): Promise<number | null> => {
     try {
@@ -139,6 +149,31 @@ export const Record = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [duration]);
 
+  // Limiter la lecture au segment actif pour la pré-écoute
+  useEffect(() => {
+    const audio = previewAudioRef.current;
+    if (!audio || activeSegmentId == null) {
+      return;
+    }
+
+    const segment = segments.find((s) => s.id === activeSegmentId);
+    if (!segment) {
+      return;
+    }
+
+    const handleTimeUpdate = () => {
+      if (audio.currentTime >= segment.endSeconds) {
+        audio.pause();
+      }
+    };
+
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    return () => {
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+    };
+  }, [activeSegmentId, segments]);
+
+
   const handleStart = async () => {
     try {
       await startRecording();
@@ -153,6 +188,33 @@ export const Record = () => {
 
   const handleStop = () => {
     stopRecording();
+  };
+
+  const handlePlaySegment = (segmentId: number) => {
+    const audio = previewAudioRef.current;
+    const segment = segments.find((s) => s.id === segmentId);
+
+    if (!audio || !segment) {
+      toast.error("Impossible de lire ce segment audio");
+      return;
+    }
+
+    try {
+      setActiveSegmentId(segmentId);
+      audio.currentTime = segment.startSeconds;
+      // play() peut être rejeté sur certains navigateurs si pas déclenché par un geste utilisateur,
+      // mais ici c'est appelé par un clic sur le bouton "Écouter".
+      // On ajoute quand même un catch par sécurité.
+      void audio.play().catch((error) => {
+        // eslint-disable-next-line no-console
+        console.error('Impossible de lire le segment:', error);
+        toast.error("Impossible de lire ce segment audio");
+      });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Erreur de lecture du segment:', error);
+      toast.error("Impossible de lire ce segment audio");
+    }
   };
 
   const handleOptimize = async () => {
@@ -189,21 +251,72 @@ export const Record = () => {
       return;
     }
 
-    const baseBlob =
-      useOptimizedVersion && optimizedBlob
-        ? optimizedBlob
-        : getAudioBlob();
-
-    if (!baseBlob) {
-      toast.error('Aucun enregistrement disponible');
-      return;
-    }
+    const extension = fileExtension || 'm4a';
+    const safeMimeType = recordingMimeType || 'audio/mp4';
+    const sanitizedTitle = title.trim().replace(/[^a-zA-Z0-9_-]+/g, '_') || 'ringtone';
 
     try {
-      // Créer un fichier à partir du blob utilisé (original ou optimisé)
-      const extension = fileExtension || 'm4a';
-      const safeMimeType = recordingMimeType || 'audio/mp4';
-      const sanitizedTitle = title.trim().replace(/[^a-zA-Z0-9_-]+/g, '_') || 'ringtone';
+      // Cas multi-parties : découpe automatique avec segments sélectionnés
+      if (!useManualTrim && segments.length > 0 && selectedSegmentIds.length > 0) {
+        const originalBlobForSegments = lastOriginalBlob ?? getAudioBlob();
+        if (!originalBlobForSegments) {
+          toast.error('Aucun enregistrement disponible pour créer les sonneries par partie');
+          return;
+        }
+
+        const selectedSegments = segments.filter((segment) =>
+          selectedSegmentIds.includes(segment.id),
+        );
+
+        if (selectedSegments.length === 0) {
+          toast.error('Sélectionnez au moins une partie à garder');
+          return;
+        }
+
+        const builtRingtones = await buildRingtonesForSegments(
+          originalBlobForSegments,
+          selectedSegments,
+        );
+
+        for (const built of builtRingtones) {
+          let finalDuration = built.durationSeconds;
+
+          if (!Number.isFinite(finalDuration) || finalDuration < 1) {
+            // On ignore cette partie si la durée est invalide
+            // et on passe à la suivante
+            // eslint-disable-next-line no-continue
+            continue;
+          }
+
+          if (finalDuration > 40) {
+            finalDuration = 40;
+          }
+
+          finalDuration = Math.round(finalDuration);
+
+          const partTitle = `${title} (partie ${built.segmentId})`;
+          const filename = `${sanitizedTitle}_partie_${built.segmentId}.${extension}`;
+          const file = new File([built.blob], filename, { type: safeMimeType });
+
+          await upload(file, partTitle, extension, finalDuration);
+        }
+
+        toast.success('Sonneries par partie enregistrées ✔️');
+        navigate('/dashboard');
+        return;
+      }
+
+      // Cas standard : une seule sonnerie (originale ou optimisée, avec ou sans découpe manuelle)
+      const baseBlob =
+        useOptimizedVersion && optimizedBlob
+          ? optimizedBlob
+          : getAudioBlob();
+
+      if (!baseBlob) {
+        toast.error('Aucun enregistrement disponible');
+        return;
+      }
+
       const filename = `${sanitizedTitle}.${extension}`;
       const file = new File([baseBlob], filename, { type: safeMimeType });
 
@@ -370,7 +483,10 @@ export const Record = () => {
                     <div className="space-y-3 text-xs text-gray-700 dark:text-gray-300">
                       <div className="flex justify-between">
                         <span>
-                          Début : <span className="font-mono">{formatTime(Math.max(0, Math.min(trimStart, duration)))}</span>
+                          Début :{' '}
+                          <span className="font-mono">
+                            {formatTime(Math.max(0, Math.min(trimStart, duration)))}
+                          </span>
                         </span>
                         <span>
                           Fin :{' '}
@@ -423,6 +539,147 @@ export const Record = () => {
                   )}
                 </div>
 
+                {/* Paramètres de découpe automatique et segments détectés */}
+                {!useManualTrim && duration > 0 && (
+                  <div className="space-y-3 border-t border-gray-200 dark:border-gray-700 pt-3 mt-2">
+                    <div className="space-y-2">
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                        Seuil de volume (dB)
+                        <span className="ml-2 text-[11px] text-gray-500 dark:text-gray-400">
+                          {silenceThresholdDb.toFixed(0)} dB
+                        </span>
+                      </label>
+                      <input
+                        type="range"
+                        min={-60}
+                        max={-10}
+                        step={1}
+                        value={silenceThresholdDb}
+                        onChange={(e) => setSilenceThresholdDb(parseInt(e.target.value, 10))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600"
+                      />
+                      <div className="flex justify-between text-[11px] text-gray-500 dark:text-gray-400">
+                        <span>-60 dB (très sensible)</span>
+                        <span>-10 dB (peu sensible)</span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+                        Durée minimale du blanc (ms)
+                        <span className="ml-2 text-[11px] text-gray-500 dark:text-gray-400">
+                          {minSilenceDurationMs} ms
+                        </span>
+                      </label>
+                      <input
+                        type="range"
+                        min={100}
+                        max={1000}
+                        step={50}
+                        value={minSilenceDurationMs}
+                        onChange={(e) => setMinSilenceDurationMs(parseInt(e.target.value, 10))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700 accent-blue-600"
+                      />
+                      <div className="flex justify-between text-[11px] text-gray-500 dark:text-gray-400">
+                        <span>100 ms (coupes fréquentes)</span>
+                        <span>1000 ms (coupes plus rares)</span>
+                      </div>
+                    </div>
+
+                    {segments.length > 0 && (
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                            Choisissez quelle(s) partie(s) vous voulez garder
+                          </p>
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                            Par défaut, la première partie est sélectionnée. Vous pouvez en choisir
+                            plusieurs, une sonnerie sera créée pour chaque partie.
+                          </p>
+                        </div>
+
+                        {/* Timeline globale avec segments colorés */}
+                        <div className="w-full h-4 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden flex">
+                          {segments.map((segment, index) => {
+                            const total = duration || segment.endSeconds;
+                            const widthPercent =
+                              total > 0 ? (segment.durationSeconds / total) * 100 : 0;
+                            const isSelected = selectedSegmentIds.includes(segment.id);
+                            const colors = [
+                              'bg-blue-500',
+                              'bg-green-500',
+                              'bg-purple-500',
+                              'bg-amber-500',
+                              'bg-rose-500',
+                            ];
+                            const colorClass = colors[index % colors.length];
+                            return (
+                              <div
+                                key={segment.id}
+                                className={`relative h-full ${colorClass} ${
+                                  isSelected ? '' : 'opacity-40'
+                                }`}
+                                style={{ width: `${Math.max(widthPercent, 2)}%` }}
+                              >
+                                <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-semibold text-gray-800 dark:text-gray-100">
+                                  {segment.id}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Liste des segments avec cases à cocher et pré-écoute */}
+                        <div className="space-y-1 max-h-40 overflow-y-auto">
+                          {segments.map((segment) => {
+                            const startSec = Math.max(0, Math.floor(segment.startSeconds));
+                            const endSec = Math.max(
+                              startSec + 1,
+                              Math.floor(segment.endSeconds),
+                            );
+                            const format = (sec: number) => {
+                              const mins = Math.floor(sec / 60);
+                              const secs = sec % 60;
+                              return `${mins.toString().padStart(2, '0')}:${secs
+                                .toString()
+                                .padStart(2, '0')}`;
+                            };
+                            const isSelected = selectedSegmentIds.includes(segment.id);
+                            return (
+                              <label
+                                key={segment.id}
+                                className="flex items-center justify-between gap-2 text-[11px] px-2 py-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700/80 cursor-pointer"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => toggleSegmentSelection(segment.id)}
+                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  />
+                                  <span className="font-medium">
+                                    Partie {segment.id}{' '}
+                                    <span className="font-normal text-gray-500 dark:text-gray-400">
+                                      ({format(startSec)} → {format(endSec)})
+                                    </span>
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handlePlaySegment(segment.id)}
+                                  className="text-[11px] px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 min-h-[28px]"
+                                >
+                                  Écouter
+                                </button>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {(lastOriginalBlob || optimizedBlob) && (
                   <>
                     <div className="flex items-center justify-between gap-2">
@@ -463,6 +720,7 @@ export const Record = () => {
 
                     <div className="space-y-2">
                       <audio
+                        ref={previewAudioRef}
                         controls
                         className="w-full"
                         src={
