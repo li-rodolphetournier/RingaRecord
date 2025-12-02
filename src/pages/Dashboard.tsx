@@ -12,7 +12,9 @@ import type { Ringtone } from '../types/ringtone.types';
 import { optimizeRingtone } from '../services/audio/smartRingtone.service';
 import { useSmartRingtone } from '../hooks/useSmartRingtone';
 import { useSegmentPreview } from '../hooks/useSegmentPreview';
+import { useEqualizer } from '../hooks/useEqualizer';
 import { buildRingtonesForSegments } from '../services/audio/ringtoneSegments.service';
+import { Equalizer } from '../components/audio/Equalizer';
 import { getRecommendedRingtoneFormat, getAvailableRingtoneFormats, getFormatLabel } from '../utils/ringtoneFormat';
 import { convertBlobToFormat, type RingtoneFormat } from '../services/audio/ringtoneConverter.service';
 import { ShareModal } from '../components/ShareModal';
@@ -40,6 +42,8 @@ export const Dashboard = () => {
   const [viewMode, setViewMode] = useState<'block' | 'landscape'>('block');
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [shareRingtone, setShareRingtone] = useState<Ringtone | null>(null);
+  const [equalizerRingtoneId, setEqualizerRingtoneId] = useState<string | null>(null);
+  const [equalizerSourceBlob, setEqualizerSourceBlob] = useState<Blob | null>(null);
 
   const {
     isOptimizing: isSmartOptimizing,
@@ -64,6 +68,20 @@ export const Dashboard = () => {
     },
   });
 
+  const {
+    isProcessing: isEqualizing,
+    isAnalyzing: isAnalyzingSpectrum,
+    equalizedBlob,
+    durationSeconds,
+    selectedPreset,
+    analysisResult,
+    error: equalizerError,
+    applyPreset,
+    analyzeAndSuggest,
+    setPreset,
+    reset: resetEqualizer,
+  } = useEqualizer();
+
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login');
@@ -71,6 +89,12 @@ export const Dashboard = () => {
     }
     fetchAll();
   }, [isAuthenticated, navigate, fetchAll]);
+
+  useEffect(() => {
+    if (equalizerError) {
+      toast.error(equalizerError);
+    }
+  }, [equalizerError]);
 
   const handleLogout = () => {
     logout();
@@ -116,6 +140,12 @@ export const Dashboard = () => {
     setSmartSourceBlob(null);
     setSmartSourceRingtoneId(null);
   }, [trimRingtoneId, reset]);
+
+  // Réinitialiser l'égaliseur lorsqu'on change de sonnerie
+  useEffect(() => {
+    resetEqualizer();
+    setEqualizerSourceBlob(null);
+  }, [equalizerRingtoneId, resetEqualizer]);
 
   const formatDuration = (seconds: number) => {
     return `${seconds}s`;
@@ -243,6 +273,65 @@ export const Dashboard = () => {
         error instanceof Error ? error.message : 'Impossible d\'analyser les segments';
       toast.error(message);
       console.error('Erreur lors de l\'analyse des segments existants:', error);
+    }
+  };
+
+  const handleAnalyzeSpectrumForEqualizer = async (ringtone: Ringtone) => {
+    try {
+      setEqualizerRingtoneId(ringtone.id);
+
+      const response = await fetch(ringtone.fileUrl);
+      if (!response.ok) {
+        throw new Error('Erreur lors du téléchargement de la sonnerie à analyser');
+      }
+
+      const originalBlob = await response.blob();
+      setEqualizerSourceBlob(originalBlob);
+
+      await analyzeAndSuggest(originalBlob);
+      toast.success('Analyse spectrale terminée ✔️');
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Impossible d'analyser le spectre";
+      toast.error(message);
+      console.error('Erreur lors de l\'analyse spectrale:', error);
+    }
+  };
+
+  const handleApplyEqualizerToExisting = async (ringtone: Ringtone) => {
+    if (!equalizerSourceBlob || equalizerRingtoneId !== ringtone.id) {
+      toast.error('Analyse spectrale requise avant l\'application de l\'égaliseur');
+      return;
+    }
+
+    try {
+      await applyPreset(equalizerSourceBlob, selectedPreset);
+
+      if (!equalizedBlob) {
+        toast.error('Erreur lors de l\'application de l\'égaliseur');
+        return;
+      }
+
+      const extension = ringtone.format;
+      const safeMimeType = equalizedBlob.type || 'audio/wav';
+      const baseTitle = `${ringtone.title} (égalisé)`;
+      const sanitizedTitle = baseTitle.trim().replace(/[^a-zA-Z0-9_-]+/g, '_') || 'ringtone_eq';
+      const filename = `${sanitizedTitle}.${extension}`;
+      const file = new File([equalizedBlob], filename, { type: safeMimeType });
+
+      const rawDuration = durationSeconds !== null && Number.isFinite(durationSeconds)
+        ? durationSeconds
+        : ringtone.duration;
+      const clampedDuration = Math.max(1, Math.min(40, Math.round(rawDuration)));
+
+      await upload(file, baseTitle, extension, clampedDuration);
+      toast.success(`Version égalisée créée : ${baseTitle}`);
+      await fetchAll();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Impossible de créer la version égalisée';
+      toast.error(message);
+      console.error('Erreur lors de la création de la version égalisée:', error);
     }
   };
 
@@ -879,6 +968,41 @@ export const Dashboard = () => {
                                   </div>
                                 </div>
                               )}
+
+                              {/* Section Égaliseur Audio */}
+                              <div className="space-y-3 border-t border-gray-200 dark:border-gray-700 pt-3 mt-2">
+                                {equalizerRingtoneId === ringtone.id ? (
+                                  <Equalizer
+                                    selectedPreset={selectedPreset}
+                                    onPresetChange={setPreset}
+                                    onAnalyze={() => handleAnalyzeSpectrumForEqualizer(ringtone)}
+                                    onApply={() => handleApplyEqualizerToExisting(ringtone)}
+                                    isAnalyzing={isAnalyzingSpectrum}
+                                    isProcessing={isEqualizing}
+                                    analysisResult={analysisResult}
+                                  />
+                                ) : (
+                                  <div className="flex items-center justify-between text-xs text-gray-700 dark:text-gray-300">
+                                    <div>
+                                      <p className="font-medium">Égaliseur Audio</p>
+                                      <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                                        Améliorez la qualité audio avec des presets d'égalisation (Bass Boost, Vocal Clarity, etc.)
+                                      </p>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="secondary"
+                                      className="min-h-[32px] text-[11px] px-3"
+                                      onClick={() => {
+                                        setEqualizerRingtoneId(ringtone.id);
+                                        void handleAnalyzeSpectrumForEqualizer(ringtone);
+                                      }}
+                                    >
+                                      Ouvrir
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         )}
@@ -1321,6 +1445,41 @@ export const Dashboard = () => {
                 </div>
                               </div>
                             )}
+
+                            {/* Section Égaliseur Audio */}
+                            <div className="space-y-3 border-t border-gray-200 dark:border-gray-700 pt-3 mt-2">
+                              {equalizerRingtoneId === ringtone.id ? (
+                                <Equalizer
+                                  selectedPreset={selectedPreset}
+                                  onPresetChange={setPreset}
+                                  onAnalyze={() => handleAnalyzeSpectrumForEqualizer(ringtone)}
+                                  onApply={() => handleApplyEqualizerToExisting(ringtone)}
+                                  isAnalyzing={isAnalyzingSpectrum}
+                                  isProcessing={isEqualizing}
+                                  analysisResult={analysisResult}
+                                />
+                              ) : (
+                                <div className="flex items-center justify-between text-xs text-gray-700 dark:text-gray-300">
+                                  <div>
+                                    <p className="font-medium">Égaliseur Audio</p>
+                                    <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                                      Améliorez la qualité audio avec des presets d'égalisation (Bass Boost, Vocal Clarity, etc.)
+                                    </p>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    className="min-h-[32px] text-[11px] px-3"
+                                    onClick={() => {
+                                      setEqualizerRingtoneId(ringtone.id);
+                                      void handleAnalyzeSpectrumForEqualizer(ringtone);
+                                    }}
+                                  >
+                                    Ouvrir
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       )}

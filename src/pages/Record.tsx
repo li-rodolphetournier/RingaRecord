@@ -6,7 +6,9 @@ import { useRingtoneStore } from '../stores/ringtoneStore';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useSmartRingtone } from '../hooks/useSmartRingtone';
 import { useBPMDetection } from '../hooks/useBPMDetection';
+import { useEqualizer } from '../hooks/useEqualizer';
 import { buildRingtonesForSegments } from '../services/audio/ringtoneSegments.service';
+import { Equalizer } from '../components/audio/Equalizer';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
@@ -64,6 +66,19 @@ export const Record = () => {
     setMinSilenceDurationMs,
     toggleSegmentSelection,
   } = useSmartRingtone();
+
+  const {
+    isProcessing: isEqualizing,
+    isAnalyzing: isAnalyzingSpectrum,
+    equalizedBlob,
+    selectedPreset,
+    analysisResult,
+    error: equalizerError,
+    applyPreset,
+    analyzeAndSuggest,
+    setPreset,
+    reset: resetEqualizer,
+  } = useEqualizer();
 
   // Détecter le support navigateur
   const browserSupport = useMemo(() => getBrowserSupport(), []);
@@ -137,6 +152,12 @@ export const Record = () => {
       toast.error(smartError);
     }
   }, [smartError]);
+
+  useEffect(() => {
+    if (equalizerError) {
+      toast.error(equalizerError);
+    }
+  }, [equalizerError]);
 
   useEffect(() => {
     if (bpmError) {
@@ -240,6 +261,7 @@ export const Record = () => {
     }
 
     setLastOriginalBlob(originalBlob);
+    resetEqualizer(); // Réinitialiser l'égaliseur quand on optimise
     try {
       const options =
         useManualTrim && duration > 1
@@ -257,6 +279,37 @@ export const Record = () => {
       toast.success('Sonnerie optimisée ✔️');
     } catch {
       // L'erreur est déjà gérée dans le hook via smartError
+    }
+  };
+
+  const handleAnalyzeSpectrum = async () => {
+    const baseBlob = lastOriginalBlob ?? getAudioBlob();
+    if (!baseBlob) {
+      toast.error('Aucun enregistrement disponible pour analyse');
+      return;
+    }
+
+    try {
+      await analyzeAndSuggest(baseBlob);
+      toast.success('Analyse spectrale terminée ✔️');
+    } catch {
+      // L'erreur est déjà gérée dans le hook
+    }
+  };
+
+  const handleApplyEqualizer = async () => {
+    const baseBlob = lastOriginalBlob ?? getAudioBlob();
+    if (!baseBlob) {
+      toast.error('Aucun enregistrement disponible pour égalisation');
+      return;
+    }
+
+    try {
+      await applyPreset(baseBlob, selectedPreset);
+      setUseOptimizedVersion(false); // Utiliser la version égalisée
+      toast.success('Égalisation appliquée ✔️');
+    } catch {
+      // L'erreur est déjà gérée dans le hook
     }
   };
 
@@ -341,11 +394,13 @@ export const Record = () => {
         return;
       }
 
-      // Cas standard : une seule sonnerie (originale ou optimisée, avec ou sans découpe manuelle)
+      // Cas standard : une seule sonnerie (originale, optimisée ou égalisée, avec ou sans découpe manuelle)
       const baseBlob =
-        useOptimizedVersion && optimizedBlob
-          ? optimizedBlob
-          : getAudioBlob();
+        useOptimizedVersion && equalizedBlob
+          ? equalizedBlob
+          : useOptimizedVersion && optimizedBlob
+            ? optimizedBlob
+            : getAudioBlob();
 
       if (!baseBlob) {
         toast.error('Aucun enregistrement disponible');
@@ -721,6 +776,21 @@ export const Record = () => {
                   </div>
                 )}
 
+                {/* Section Égaliseur Audio */}
+                {!isRecording && duration > 0 && (
+                  <div className="space-y-3 border-t border-gray-200 dark:border-gray-700 pt-3 mt-2">
+                    <Equalizer
+                      selectedPreset={selectedPreset}
+                      onPresetChange={setPreset}
+                      onAnalyze={handleAnalyzeSpectrum}
+                      onApply={handleApplyEqualizer}
+                      isAnalyzing={isAnalyzingSpectrum}
+                      isProcessing={isEqualizing}
+                      analysisResult={analysisResult}
+                    />
+                  </div>
+                )}
+
                 {/* Section BPM & synchronisation rythmique (prévisualisation) */}
                 <div className="space-y-2 border-t border-gray-200 dark:border-gray-700 pt-3 mt-2">
                   <div className="flex items-center justify-between gap-2">
@@ -768,7 +838,7 @@ export const Record = () => {
                   )}
                 </div>
 
-                {(lastOriginalBlob || optimizedBlob) && (
+                {(lastOriginalBlob || optimizedBlob || equalizedBlob) && (
                   <>
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -789,8 +859,8 @@ export const Record = () => {
                         <button
                           type="button"
                           onClick={() => {
-                            if (!optimizedBlob) {
-                              toast.info('Clique sur ✨ Optimiser pour générer la version optimisée');
+                            if (!optimizedBlob && !equalizedBlob) {
+                              toast.info('Clique sur ✨ Optimiser ou appliquez un égaliseur');
                               return;
                             }
                             setUseOptimizedVersion(true);
@@ -801,7 +871,7 @@ export const Record = () => {
                               : 'text-gray-500 dark:text-gray-300'
                           }`}
                         >
-                          Optimisée
+                          {equalizedBlob ? 'Égalisée' : 'Optimisée'}
                         </button>
                       </div>
                     </div>
@@ -812,16 +882,24 @@ export const Record = () => {
                         controls
                         className="w-full"
                         src={
-                          useOptimizedVersion && optimizedBlob
-                            ? URL.createObjectURL(optimizedBlob)
+                          useOptimizedVersion
+                            ? equalizedBlob
+                              ? URL.createObjectURL(equalizedBlob)
+                              : optimizedBlob
+                                ? URL.createObjectURL(optimizedBlob)
+                                : undefined
                             : lastOriginalBlob
                               ? URL.createObjectURL(lastOriginalBlob)
                               : undefined
                         }
                       />
                       <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                        {useOptimizedVersion && optimizedBlob
-                          ? 'Lecture de la version optimisée (WAV normalisée avec fade).'
+                        {useOptimizedVersion
+                          ? equalizedBlob
+                            ? `Lecture de la version égalisée (preset: ${selectedPreset}).`
+                            : optimizedBlob
+                              ? 'Lecture de la version optimisée (WAV normalisée avec fade).'
+                              : 'Aucune version traitée disponible.'
                           : 'Lecture de la version originale brute.'}
                       </p>
                     </div>
