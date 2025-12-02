@@ -13,6 +13,8 @@ import { optimizeRingtone } from '../services/audio/smartRingtone.service';
 import { useSmartRingtone } from '../hooks/useSmartRingtone';
 import { useSegmentPreview } from '../hooks/useSegmentPreview';
 import { buildRingtonesForSegments } from '../services/audio/ringtoneSegments.service';
+import { getRecommendedRingtoneFormat, getAvailableRingtoneFormats, getFormatLabel } from '../utils/ringtoneFormat';
+import { convertBlobToFormat, type RingtoneFormat } from '../services/audio/ringtoneConverter.service';
 
 export const Dashboard = () => {
   const navigate = useNavigate();
@@ -29,10 +31,12 @@ export const Dashboard = () => {
   const [trimRingtoneId, setTrimRingtoneId] = useState<string | null>(null);
   const [trimStart, setTrimStart] = useState<number>(0);
   const [trimEnd, setTrimEnd] = useState<number>(0);
+  const [downloadMenuId, setDownloadMenuId] = useState<string | null>(null);
   const [smartSourceBlob, setSmartSourceBlob] = useState<Blob | null>(null);
   const [smartSourceRingtoneId, setSmartSourceRingtoneId] = useState<string | null>(null);
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [editingTitleValue, setEditingTitleValue] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'block' | 'landscape'>('block');
 
   const {
     isOptimizing: isSmartOptimizing,
@@ -120,32 +124,47 @@ export const Dashboard = () => {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const handleDownload = async (ringtone: Ringtone) => {
+  const handleDownload = async (ringtone: Ringtone, format?: RingtoneFormat) => {
     try {
       const response = await fetch(ringtone.fileUrl);
       if (!response.ok) {
         throw new Error('Erreur lors du téléchargement du fichier');
       }
       
-      const blob = await response.blob();
+      let blob = await response.blob();
+      let finalFormat = format || (ringtone.format as RingtoneFormat);
+      let filename = `${ringtone.title}.${finalFormat}`;
+
+      // Si un format spécifique est demandé et différent du format original, convertir
+      if (format && format !== ringtone.format) {
+        try {
+          toast.info('Conversion en cours...', { autoClose: 2000 });
+          blob = await convertBlobToFormat(blob, { format, quality: 0.9 });
+          filename = `${ringtone.title}.${format}`;
+        } catch (conversionError) {
+          console.error('Erreur de conversion:', conversionError);
+          toast.warning('Conversion échouée, téléchargement du format original');
+          // Continuer avec le format original
+          finalFormat = ringtone.format as RingtoneFormat;
+          filename = `${ringtone.title}.${ringtone.format}`;
+        }
+      }
+
       const url = window.URL.createObjectURL(blob);
-      
-      // Créer un lien de téléchargement
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${ringtone.title}.${ringtone.format}`;
+      link.download = filename;
       link.style.display = 'none';
       
-      // Ajouter au DOM, cliquer, puis retirer
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       
-      // Nettoyer l'URL du blob après un délai
       setTimeout(() => {
         window.URL.revokeObjectURL(url);
       }, 100);
-      toast.success(`Téléchargement prêt : ${ringtone.title}`);
+
+      toast.success(`Téléchargement prêt : ${filename}`);
     } catch (error) {
       console.error('Erreur lors du téléchargement:', error);
       toast.error('Téléchargement impossible, ouverture dans un nouvel onglet.');
@@ -367,9 +386,32 @@ export const Dashboard = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h2 className="text-xl font-semibold mb-6 text-gray-900 dark:text-gray-100">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
           Mes sonneries
         </h2>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {viewMode === 'block' ? 'Bloc' : 'Paysage'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setViewMode(viewMode === 'block' ? 'landscape' : 'block')}
+              className="p-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              title={viewMode === 'block' ? 'Passer en mode paysage' : 'Passer en mode bloc'}
+            >
+              {viewMode === 'block' ? (
+                <svg className="w-5 h-5 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                </svg>
+              )}
+            </button>
+          </div>
+        </div>
 
         {isLoading ? (
           <div className="text-center py-12">
@@ -387,12 +429,19 @@ export const Dashboard = () => {
             </div>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className={viewMode === 'block' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' : 'flex flex-col gap-4'}>
             {ringtones.map((ringtone) => (
-              <Card key={ringtone.id} className="hover:shadow-lg transition-shadow">
-                <div className="flex items-start justify-between gap-2 mb-2">
+              <Card key={ringtone.id} className={`hover:shadow-lg transition-shadow overflow-visible ${viewMode === 'landscape' ? 'flex flex-row gap-4 p-4' : ''}`}>
+                {viewMode === 'landscape' ? (
+                  <>
+                    {/* Mode paysage : Player à gauche, infos à droite */}
+                    <div className="flex-shrink-0 w-48">
+                      <AudioPlayer src={ringtone.fileUrl} title="Écouter" />
+                    </div>
+                    <div className="flex-1 min-w-0 flex flex-col">
+                      <div className="flex items-start justify-between gap-2 mb-2 min-w-0">
                   {editingTitleId === ringtone.id ? (
-                    <div className="flex-1 space-y-1">
+                    <div className="flex-1 space-y-1 min-w-0">
                       <input
                         type="text"
                         value={editingTitleValue}
@@ -419,8 +468,8 @@ export const Dashboard = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 flex-1">
-                      <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100 truncate min-w-0 flex-1">
                         {ringtone.title}
                       </h3>
                       <button
@@ -458,12 +507,438 @@ export const Dashboard = () => {
                     <button
                       type="button"
                       onClick={() => handleStartRename(ringtone)}
-                      className="text-xs px-2 py-1 rounded-full border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 min-h-[28px]"
+                      className="text-[11px] px-2 py-1 rounded-full border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 min-h-[28px] flex-shrink-0"
                     >
                       Renommer
                     </button>
                   )}
-                </div>
+                      </div>
+                      <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400 mb-4">
+                        <p>Format: {ringtone.format.toUpperCase()}</p>
+                        <p>Durée: {formatDuration(ringtone.duration)}</p>
+                        <p>Taille: {formatSize(ringtone.sizeBytes)}</p>
+                        <p>
+                          Créé le:{' '}
+                          {format(new Date(ringtone.createdAt), 'dd MMM yyyy', { locale: fr })}
+                        </p>
+                      </div>
+                      <div className="mt-4 flex flex-col gap-2">
+                        <div className="flex flex-col sm:flex-row gap-2 min-w-0">
+                          {getAvailableRingtoneFormats().length > 1 ? (
+                            <div className="relative flex-[2] min-w-0 z-50">
+                              <Button
+                                onClick={() => setDownloadMenuId(downloadMenuId === ringtone.id ? null : ringtone.id)}
+                                variant="primary"
+                                className="w-full min-h-[48px] text-sm !rounded-xl px-4 py-2.5"
+                              >
+                                <svg className="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                                <span className="truncate">Télécharger</span>
+                                <svg className="w-4 h-4 inline ml-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </Button>
+
+                              {downloadMenuId === ringtone.id && (
+                                <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl overflow-hidden">
+                                  {getAvailableRingtoneFormats().map((format) => (
+                                    <button
+                                      key={format}
+                                      type="button"
+                                      onClick={() => {
+                                        handleDownload(ringtone, format);
+                                        setDownloadMenuId(null);
+                                      }}
+                                      className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 first:rounded-t-lg last:rounded-b-lg"
+                                    >
+                                      {getFormatLabel(format)}
+                                      {format === getRecommendedRingtoneFormat() && (
+                                        <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(recommandé)</span>
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <Button
+                              onClick={() => handleDownload(ringtone, getRecommendedRingtoneFormat())}
+                              variant="primary"
+                              className="flex-[2] min-h-[48px] text-sm !rounded-xl px-4 py-2.5 min-w-0"
+                            >
+                              <svg className="w-5 h-5 inline mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                              </svg>
+                              <span className="truncate">Enregistrer</span>
+                            </Button>
+                          )}
+                          <Button
+                            onClick={() => {
+                              if (trimRingtoneId === ringtone.id) {
+                                setTrimRingtoneId(null);
+                              } else {
+                                setTrimRingtoneId(ringtone.id);
+                                setTrimStart(0);
+                                setTrimEnd(ringtone.duration);
+                              }
+                            }}
+                            variant="secondary"
+                            className="flex-1 min-h-[36px] text-[11px] !rounded-xl px-2 py-1.5 min-w-0"
+                          >
+                            <span className="truncate">✂️ Découper</span>
+                          </Button>
+                          <Button
+                            onClick={() => handleDelete(ringtone)}
+                            variant="danger"
+                            className="flex-1 min-h-[36px] text-[11px] !rounded-xl px-2 py-1.5 min-w-0"
+                            disabled={ringtone.isProtected}
+                            title={
+                              ringtone.isProtected
+                                ? 'Désactivez la protection (⭐) pour supprimer'
+                                : 'Supprimer la sonnerie'
+                            }
+                          >
+                            <svg className="w-4 h-4 inline mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            <span className="truncate">{ringtone.isProtected ? 'Protégée' : 'Supprimer'}</span>
+                          </Button>
+                        </div>
+
+                        {trimRingtoneId === ringtone.id && ringtone.duration > 1 && (
+                          <div className="space-y-3 border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-white/60 dark:bg-gray-800/60">
+                            {/* Découpe manuelle simple */}
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between text-xs text-gray-700 dark:text-gray-300">
+                                <span className="font-medium">Découpe manuelle</span>
+                                <span className="font-mono">
+                                  {Math.max(0, Math.min(trimStart, ringtone.duration))}s →{' '}
+                                  {Math.max(
+                                    Math.min(trimStart + 1, ringtone.duration),
+                                    Math.min(trimEnd || ringtone.duration, ringtone.duration),
+                                  )}
+                                  s
+                                </span>
+                              </div>
+
+                              <div className="space-y-1">
+                                <label className="block text-[11px] text-gray-500 dark:text-gray-400">
+                                  Début
+                                </label>
+                                <input
+                                  type="range"
+                                  min={0}
+                                  max={Math.max(1, ringtone.duration - 1)}
+                                  step={0.1}
+                                  value={trimStart}
+                                  onChange={(e) => {
+                                    const next = parseFloat(e.target.value);
+                                    setTrimStart(
+                                      Math.min(next, Math.max(0, (trimEnd || ringtone.duration) - 1)),
+                                    );
+                                  }}
+                                  className="range-default"
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                <label className="block text-[11px] text-gray-500 dark:text-gray-400">
+                                  Fin
+                                </label>
+                                <input
+                                  type="range"
+                                  min={Math.min(ringtone.duration - 1, trimStart + 1)}
+                                  max={ringtone.duration}
+                                  step={0.1}
+                                  value={trimEnd || ringtone.duration}
+                                  onChange={(e) => {
+                                    const next = parseFloat(e.target.value);
+                                    setTrimEnd(Math.max(next, trimStart + 1));
+                                  }}
+                                  className="range-default"
+                                />
+                              </div>
+
+                              <div className="flex justify-end">
+                                <Button
+                                  type="button"
+                                  onClick={() => handleOptimizeExisting(ringtone)}
+                                  variant="secondary"
+                                  className="min-h-[36px]"
+                                  isLoading={optimizingId === ringtone.id}
+                                  disabled={optimizingId === ringtone.id}
+                                >
+                                  ✨ Créer une version optimisée découpée
+                                </Button>
+                              </div>
+                            </div>
+
+                            {/* Assistant Smart Ringtone multi-parties */}
+                            <div className="space-y-3 border-t border-gray-200 dark:border-gray-700 pt-3 mt-2">
+                              <div className="flex items-center justify-between text-xs text-gray-700 dark:text-gray-300">
+                                <div>
+                                  <p className="font-medium">Assistant Smart Ringtone (multi-parties)</p>
+                                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                                    Détecte automatiquement les silences et permet de garder plusieurs
+                                    parties distinctes.
+                                  </p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  className="min-h-[32px] text-[11px] px-3"
+                                  onClick={() => handleAnalyzeExistingSmart(ringtone)}
+                                  isLoading={isSmartOptimizing && smartSourceRingtoneId === ringtone.id}
+                                  disabled={isSmartOptimizing && smartSourceRingtoneId === ringtone.id}
+                                >
+                                  Analyser
+                                </Button>
+                              </div>
+
+                              <div className="space-y-2">
+                                <label className="block text-[11px] font-medium text-gray-700 dark:text-gray-300">
+                                  Seuil de volume (dB)
+                                  <span className="ml-2 text-[11px] text-gray-500 dark:text-gray-400">
+                                    {silenceThresholdDb.toFixed(0)} dB
+                                  </span>
+                                </label>
+                                <input
+                                  type="range"
+                                  min={-60}
+                                  max={-10}
+                                  step={1}
+                                  value={silenceThresholdDb}
+                                  onChange={(e) => setSilenceThresholdDb(parseInt(e.target.value, 10))}
+                                  className="range-default"
+                                />
+                                <div className="flex justify-between text-[11px] text-gray-500 dark:text-gray-400">
+                                  <span>-60 dB (très sensible)</span>
+                                  <span>-10 dB (peu sensible)</span>
+                                </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                <label className="block text-[11px] font-medium text-gray-700 dark:text-gray-300">
+                                  Durée minimale du blanc (ms)
+                                  <span className="ml-2 text-[11px] text-gray-500 dark:text-gray-400">
+                                    {minSilenceDurationMs} ms
+                                  </span>
+                                </label>
+                                <input
+                                  type="range"
+                                  min={100}
+                                  max={1000}
+                                  step={50}
+                                  value={minSilenceDurationMs}
+                                  onChange={(e) => setMinSilenceDurationMs(parseInt(e.target.value, 10))}
+                                  className="range-default"
+                                />
+                                <div className="flex justify-between text-[11px] text-gray-500 dark:text-gray-400">
+                                  <span>100 ms (coupes fréquentes)</span>
+                                  <span>1000 ms (coupes plus rares)</span>
+                                </div>
+                              </div>
+
+                              {smartSourceRingtoneId === ringtone.id && segments.length > 0 && (
+                                <div className="space-y-3">
+                                  <div>
+                                    <p className="text-[11px] font-medium text-gray-700 dark:text-gray-300">
+                                      Choisissez quelle(s) partie(s) vous voulez garder
+                                    </p>
+                                    <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                                      Une nouvelle sonnerie sera créée pour chaque partie sélectionnée.
+                                    </p>
+                                  </div>
+
+                                  {/* Timeline globale */}
+                                  <div className="w-full h-4 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden flex">
+                                    {segments.map((segment, index) => {
+                                      const total = ringtone.duration || segment.endSeconds;
+                                      const widthPercent =
+                                        total > 0 ? (segment.durationSeconds / total) * 100 : 0;
+                                      const isSelected = selectedSegmentIds.includes(segment.id);
+                                      const colors = [
+                                        'bg-blue-500',
+                                        'bg-green-500',
+                                        'bg-purple-500',
+                                        'bg-amber-500',
+                                        'bg-rose-500',
+                                      ];
+                                      const colorClass = colors[index % colors.length];
+                                      return (
+                                        <div
+                                          key={segment.id}
+                                          className={`relative h-full ${colorClass} ${
+                                            isSelected ? '' : 'opacity-40'
+                                          }`}
+                                          style={{ width: `${Math.max(widthPercent, 2)}%` }}
+                                        >
+                                          <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-semibold text-gray-800 dark:text-gray-100">
+                                            {segment.id}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+
+                                  {/* Liste des segments + pré-écoute */}
+                                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                                    {segments.map((segment) => {
+                                      const startSec = Math.max(0, Math.floor(segment.startSeconds));
+                                      const endSec = Math.max(
+                                        startSec + 1,
+                                        Math.floor(segment.endSeconds),
+                                      );
+                                      const format = (sec: number) => {
+                                        const mins = Math.floor(sec / 60);
+                                        const secs = sec % 60;
+                                        return `${mins.toString().padStart(2, '0')}:${secs
+                                          .toString()
+                                          .padStart(2, '0')}`;
+                                      };
+                                      const isSelected = selectedSegmentIds.includes(segment.id);
+                                      return (
+                                        <label
+                                          key={segment.id}
+                                          className="flex items-center justify-between gap-2 text-[11px] px-2 py-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700/80 cursor-pointer"
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            <input
+                                              type="checkbox"
+                                              checked={isSelected}
+                                              onChange={() => toggleSegmentSelection(segment.id)}
+                                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                            />
+                                            <span className="font-medium">
+                                              Partie {segment.id}{' '}
+                                              <span className="font-normal text-gray-500 dark:text-gray-400">
+                                                ({format(startSec)} → {format(endSec)})
+                                              </span>
+                                            </span>
+                                          </div>
+                                          <button
+                                            type="button"
+                                            onClick={() => playSmartSegment(segment.id)}
+                                            className="text-[11px] px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 min-h-[28px]"
+                                          >
+                                            Écouter
+                                          </button>
+                                        </label>
+                                      );
+                                    })}
+                                  </div>
+
+                                  {/* Prévisualisation générale pour les segments */}
+                                  {smartSourceBlob && smartSourceRingtoneId === ringtone.id && (
+                                    <div className="space-y-2">
+                                      <audio
+                                        ref={smartPreviewRef}
+                                        controls
+                                        className="w-full"
+                                        src={URL.createObjectURL(smartSourceBlob)}
+                                      />
+                                      <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                                        Pré-écoute des différentes parties détectées.
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  <div className="flex justify-end">
+                                    <Button
+                                      type="button"
+                                      variant="primary"
+                                      className="min-h-[32px] text-[11px] px-3"
+                                      onClick={() => handleCreateSegmentVersions(ringtone)}
+                                    >
+                                      💾 Créer une sonnerie par partie sélectionnée
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Mode bloc : layout vertical classique */}
+                    <div className="flex items-start justify-between gap-2 mb-2 min-w-0">
+                      {editingTitleId === ringtone.id ? (
+                        <div className="flex-1 space-y-1 min-w-0">
+                          <input
+                            type="text"
+                            value={editingTitleValue}
+                            onChange={(e) => setEditingTitleValue(e.target.value)}
+                            className="w-full px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+                          />
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant="primary"
+                              className="text-xs px-2 py-1 min-h-[28px]"
+                              onClick={() => handleConfirmRename(ringtone)}
+                            >
+                              ✔️ Enregistrer
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              className="text-xs px-2 py-1 min-h-[28px]"
+                              onClick={handleCancelRename}
+                            >
+                              Annuler
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100 truncate min-w-0 flex-1">
+                  {ringtone.title}
+                </h3>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleProtection(ringtone)}
+                            className={`flex-shrink-0 transition-colors min-h-[28px] min-w-[28px] flex items-center justify-center rounded-full ${
+                              ringtone.isProtected
+                                ? 'text-yellow-500 hover:text-yellow-600 dark:text-yellow-400 dark:hover:text-yellow-300'
+                                : 'text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300'
+                            }`}
+                            title={
+                              ringtone.isProtected
+                                ? 'Protégée - Cliquez pour désactiver la protection'
+                                : 'Non protégée - Cliquez pour activer la protection'
+                            }
+                          >
+                            <svg
+                              className="w-5 h-5"
+                              fill={ringtone.isProtected ? 'currentColor' : 'none'}
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      )}
+                      {editingTitleId !== ringtone.id && (
+                        <button
+                          type="button"
+                          onClick={() => handleStartRename(ringtone)}
+                          className="text-[11px] px-2 py-1 rounded-full border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 min-h-[28px] flex-shrink-0"
+                        >
+                          Renommer
+                        </button>
+                      )}
+                    </div>
                 <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400 mb-4">
                   <p>Format: {ringtone.format.toUpperCase()}</p>
                   <p>Durée: {formatDuration(ringtone.duration)}</p>
@@ -479,304 +954,345 @@ export const Dashboard = () => {
                   <AudioPlayer src={ringtone.fileUrl} title="Écouter" />
                 </div>
 
-                <div className="mt-4 flex flex-col gap-2">
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <Button
-                      onClick={() => handleDownload(ringtone)}
-                      variant="primary"
-                      className="flex-1 min-h-[40px] text-xs !rounded-xl px-3 py-2"
-                    >
-                      <svg className="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                      Enregistrer sur téléphone
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        if (trimRingtoneId === ringtone.id) {
-                          setTrimRingtoneId(null);
-                        } else {
-                          setTrimRingtoneId(ringtone.id);
-                          setTrimStart(0);
-                          setTrimEnd(ringtone.duration);
-                        }
-                      }}
-                      variant="secondary"
-                      className="flex-1 min-h-[40px] text-xs !rounded-xl px-3 py-2"
-                    >
-                      ✂️ Découper / optimiser
-                    </Button>
-                    <Button
-                      onClick={() => handleDelete(ringtone)}
-                      variant="danger"
-                      className="flex-1 min-h-[40px] text-xs !rounded-xl px-3 py-2"
-                      disabled={ringtone.isProtected}
-                      title={
-                        ringtone.isProtected
-                          ? 'Désactivez la protection (⭐) pour supprimer'
-                          : 'Supprimer la sonnerie'
-                      }
-                    >
-                      <svg className="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                      {ringtone.isProtected ? 'Protégée' : 'Supprimer'}
-                    </Button>
-                  </div>
+                    <div className="mt-4 flex flex-col gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2 min-w-0">
+                        {getAvailableRingtoneFormats().length > 1 ? (
+                          <div className="relative flex-[2] min-w-0 z-50">
+                  <Button
+                              onClick={() => setDownloadMenuId(downloadMenuId === ringtone.id ? null : ringtone.id)}
+                    variant="primary"
+                              className="w-full min-h-[48px] text-sm !rounded-xl px-4 py-2.5"
+                  >
+                    <svg className="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                              <span className="truncate">Télécharger</span>
+                              <svg className="w-4 h-4 inline ml-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </Button>
 
-                  {trimRingtoneId === ringtone.id && ringtone.duration > 1 && (
-                    <div className="space-y-3 border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-white/60 dark:bg-gray-800/60">
-                      {/* Découpe manuelle simple */}
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between text-xs text-gray-700 dark:text-gray-300">
-                          <span className="font-medium">Découpe manuelle</span>
-                          <span className="font-mono">
-                            {Math.max(0, Math.min(trimStart, ringtone.duration))}s →{' '}
-                            {Math.max(
-                              Math.min(trimStart + 1, ringtone.duration),
-                              Math.min(trimEnd || ringtone.duration, ringtone.duration),
-                            )}
-                            s
-                          </span>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="block text-[11px] text-gray-500 dark:text-gray-400">
-                            Début
-                          </label>
-                          <input
-                            type="range"
-                            min={0}
-                            max={Math.max(1, ringtone.duration - 1)}
-                            step={0.1}
-                          value={trimStart}
-                            onChange={(e) => {
-                              const next = parseFloat(e.target.value);
-                              setTrimStart(
-                                Math.min(next, Math.max(0, (trimEnd || ringtone.duration) - 1)),
-                              );
-                            }}
-                          className="range-default"
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="block text-[11px] text-gray-500 dark:text-gray-400">
-                            Fin
-                          </label>
-                          <input
-                            type="range"
-                            min={Math.min(ringtone.duration - 1, trimStart + 1)}
-                            max={ringtone.duration}
-                            step={0.1}
-                          value={trimEnd || ringtone.duration}
-                            onChange={(e) => {
-                              const next = parseFloat(e.target.value);
-                              setTrimEnd(Math.max(next, trimStart + 1));
-                            }}
-                          className="range-default"
-                          />
-                        </div>
-
-                        <div className="flex justify-end">
-                          <Button
-                            onClick={() => handleOptimizeExisting(ringtone)}
-                            variant="secondary"
-                            className="min-h-[36px]"
-                            isLoading={optimizingId === ringtone.id}
-                            disabled={optimizingId === ringtone.id}
-                          >
-                            ✨ Créer une version optimisée découpée
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Assistant Smart Ringtone multi-parties */}
-                      <div className="space-y-3 border-t border-gray-200 dark:border-gray-700 pt-3 mt-2">
-                        <div className="flex items-center justify-between text-xs text-gray-700 dark:text-gray-300">
-                          <div>
-                            <p className="font-medium">Assistant Smart Ringtone (multi-parties)</p>
-                            <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                              Détecte automatiquement les silences et permet de garder plusieurs
-                              parties distinctes.
-                            </p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            className="min-h-[32px] text-[11px] px-3"
-                            onClick={() => handleAnalyzeExistingSmart(ringtone)}
-                            isLoading={isSmartOptimizing && smartSourceRingtoneId === ringtone.id}
-                            disabled={isSmartOptimizing && smartSourceRingtoneId === ringtone.id}
-                          >
-                            Analyser
-                          </Button>
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="block text-[11px] font-medium text-gray-700 dark:text-gray-300">
-                            Seuil de volume (dB)
-                            <span className="ml-2 text-[11px] text-gray-500 dark:text-gray-400">
-                              {silenceThresholdDb.toFixed(0)} dB
-                            </span>
-                          </label>
-                          <input
-                            type="range"
-                            min={-60}
-                            max={-10}
-                            step={1}
-                          value={silenceThresholdDb}
-                            onChange={(e) => setSilenceThresholdDb(parseInt(e.target.value, 10))}
-                          className="range-default"
-                          />
-                          <div className="flex justify-between text-[11px] text-gray-500 dark:text-gray-400">
-                            <span>-60 dB (très sensible)</span>
-                            <span>-10 dB (peu sensible)</span>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="block text-[11px] font-medium text-gray-700 dark:text-gray-300">
-                            Durée minimale du blanc (ms)
-                            <span className="ml-2 text-[11px] text-gray-500 dark:text-gray-400">
-                              {minSilenceDurationMs} ms
-                            </span>
-                          </label>
-                          <input
-                            type="range"
-                            min={100}
-                            max={1000}
-                            step={50}
-                          value={minSilenceDurationMs}
-                            onChange={(e) => setMinSilenceDurationMs(parseInt(e.target.value, 10))}
-                          className="range-default"
-                          />
-                          <div className="flex justify-between text-[11px] text-gray-500 dark:text-gray-400">
-                            <span>100 ms (coupes fréquentes)</span>
-                            <span>1000 ms (coupes plus rares)</span>
-                          </div>
-                        </div>
-
-                        {smartSourceRingtoneId === ringtone.id && segments.length > 0 && (
-                          <div className="space-y-3">
-                            <div>
-                              <p className="text-[11px] font-medium text-gray-700 dark:text-gray-300">
-                                Choisissez quelle(s) partie(s) vous voulez garder
-                              </p>
-                              <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                                Une nouvelle sonnerie sera créée pour chaque partie sélectionnée.
-                              </p>
-                            </div>
-
-                            {/* Timeline globale */}
-                            <div className="w-full h-4 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden flex">
-                              {segments.map((segment, index) => {
-                                const total = ringtone.duration || segment.endSeconds;
-                                const widthPercent =
-                                  total > 0 ? (segment.durationSeconds / total) * 100 : 0;
-                                const isSelected = selectedSegmentIds.includes(segment.id);
-                                const colors = [
-                                  'bg-blue-500',
-                                  'bg-green-500',
-                                  'bg-purple-500',
-                                  'bg-amber-500',
-                                  'bg-rose-500',
-                                ];
-                                const colorClass = colors[index % colors.length];
-                                return (
-                                  <div
-                                    key={segment.id}
-                                    className={`relative h-full ${colorClass} ${
-                                      isSelected ? '' : 'opacity-40'
-                                    }`}
-                                    style={{ width: `${Math.max(widthPercent, 2)}%` }}
+                            {downloadMenuId === ringtone.id && (
+                              <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl overflow-hidden">
+                                {getAvailableRingtoneFormats().map((format) => (
+                                  <button
+                                    key={format}
+                                    type="button"
+                                    onClick={() => {
+                                      handleDownload(ringtone, format);
+                                      setDownloadMenuId(null);
+                                    }}
+                                    className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 first:rounded-t-lg last:rounded-b-lg"
                                   >
-                                    <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-semibold text-gray-800 dark:text-gray-100">
-                                      {segment.id}
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-
-                            {/* Liste des segments + pré-écoute */}
-                            <div className="space-y-1 max-h-40 overflow-y-auto">
-                              {segments.map((segment) => {
-                                const startSec = Math.max(0, Math.floor(segment.startSeconds));
-                                const endSec = Math.max(
-                                  startSec + 1,
-                                  Math.floor(segment.endSeconds),
-                                );
-                                const format = (sec: number) => {
-                                  const mins = Math.floor(sec / 60);
-                                  const secs = sec % 60;
-                                  return `${mins.toString().padStart(2, '0')}:${secs
-                                    .toString()
-                                    .padStart(2, '0')}`;
-                                };
-                                const isSelected = selectedSegmentIds.includes(segment.id);
-                                return (
-                                  <label
-                                    key={segment.id}
-                                    className="flex items-center justify-between gap-2 text-[11px] px-2 py-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700/80 cursor-pointer"
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <input
-                                        type="checkbox"
-                                        checked={isSelected}
-                                        onChange={() => toggleSegmentSelection(segment.id)}
-                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                      />
-                                      <span className="font-medium">
-                                        Partie {segment.id}{' '}
-                                        <span className="font-normal text-gray-500 dark:text-gray-400">
-                                          ({format(startSec)} → {format(endSec)})
-                                        </span>
-                                      </span>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => playSmartSegment(segment.id)}
-                                      className="text-[11px] px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 min-h-[28px]"
-                                    >
-                                      Écouter
-                                    </button>
-                                  </label>
-                                );
-                              })}
-                            </div>
-
-                            {/* Prévisualisation générale pour les segments */}
-                            {smartSourceBlob && smartSourceRingtoneId === ringtone.id && (
-                              <div className="space-y-2">
-                                <audio
-                                  ref={smartPreviewRef}
-                                  controls
-                                  className="w-full"
-                                  src={URL.createObjectURL(smartSourceBlob)}
-                                />
-                                <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                                  Pré-écoute des différentes parties détectées.
-                                </p>
+                                    {getFormatLabel(format)}
+                                    {format === getRecommendedRingtoneFormat() && (
+                                      <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(recommandé)</span>
+                                    )}
+                                  </button>
+                                ))}
                               </div>
                             )}
+                          </div>
+                        ) : (
+                          <Button
+                            onClick={() => handleDownload(ringtone, getRecommendedRingtoneFormat())}
+                            variant="primary"
+                            className="flex-[2] min-h-[48px] text-sm !rounded-xl px-4 py-2.5 min-w-0"
+                          >
+                            <svg className="w-5 h-5 inline mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            <span className="truncate">Enregistrer</span>
+                  </Button>
+                        )}
+                  <Button
+                          onClick={() => {
+                            if (trimRingtoneId === ringtone.id) {
+                              setTrimRingtoneId(null);
+                            } else {
+                              setTrimRingtoneId(ringtone.id);
+                              setTrimStart(0);
+                              setTrimEnd(ringtone.duration);
+                            }
+                          }}
+                    variant="secondary"
+                          className="flex-1 min-h-[36px] text-[11px] !rounded-xl px-2 py-1.5 min-w-0"
+                  >
+                          <span className="truncate">✂️ Découper</span>
+                  </Button>
+                  <Button
+                    onClick={() => handleDelete(ringtone)}
+                    variant="danger"
+                          className="flex-1 min-h-[36px] text-[11px] !rounded-xl px-2 py-1.5 min-w-0"
+                          disabled={ringtone.isProtected}
+                          title={
+                            ringtone.isProtected
+                              ? 'Désactivez la protection (⭐) pour supprimer'
+                              : 'Supprimer la sonnerie'
+                          }
+                        >
+                          <svg className="w-4 h-4 inline mr-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                          <span className="truncate">{ringtone.isProtected ? 'Protégée' : 'Supprimer'}</span>
+                        </Button>
+                      </div>
+
+                      {trimRingtoneId === ringtone.id && ringtone.duration > 1 && (
+                        <div className="space-y-3 border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-white/60 dark:bg-gray-800/60">
+                          {/* Découpe manuelle simple */}
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between text-xs text-gray-700 dark:text-gray-300">
+                              <span className="font-medium">Découpe manuelle</span>
+                              <span className="font-mono">
+                                {Math.max(0, Math.min(trimStart, ringtone.duration))}s →{' '}
+                                {Math.max(
+                                  Math.min(trimStart + 1, ringtone.duration),
+                                  Math.min(trimEnd || ringtone.duration, ringtone.duration),
+                                )}
+                                s
+                              </span>
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="block text-[11px] text-gray-500 dark:text-gray-400">
+                                Début
+                              </label>
+                              <input
+                                type="range"
+                                min={0}
+                                max={Math.max(1, ringtone.duration - 1)}
+                                step={0.1}
+                                value={trimStart}
+                                onChange={(e) => {
+                                  const next = parseFloat(e.target.value);
+                                  setTrimStart(
+                                    Math.min(next, Math.max(0, (trimEnd || ringtone.duration) - 1)),
+                                  );
+                                }}
+                                className="range-default"
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="block text-[11px] text-gray-500 dark:text-gray-400">
+                                Fin
+                              </label>
+                              <input
+                                type="range"
+                                min={Math.min(ringtone.duration - 1, trimStart + 1)}
+                                max={ringtone.duration}
+                                step={0.1}
+                                value={trimEnd || ringtone.duration}
+                                onChange={(e) => {
+                                  const next = parseFloat(e.target.value);
+                                  setTrimEnd(Math.max(next, trimStart + 1));
+                                }}
+                                className="range-default"
+                              />
+                            </div>
 
                             <div className="flex justify-end">
                               <Button
-                                type="button"
-                                variant="primary"
-                                className="min-h-[32px] text-[11px] px-3"
-                                onClick={() => handleCreateSegmentVersions(ringtone)}
+                                onClick={() => handleOptimizeExisting(ringtone)}
+                                variant="secondary"
+                                className="min-h-[36px]"
+                                isLoading={optimizingId === ringtone.id}
+                                disabled={optimizingId === ringtone.id}
                               >
-                                💾 Créer une sonnerie par partie sélectionnée
+                                ✨ Créer une version optimisée découpée
                               </Button>
                             </div>
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
+
+                          {/* Assistant Smart Ringtone multi-parties */}
+                          <div className="space-y-3 border-t border-gray-200 dark:border-gray-700 pt-3 mt-2">
+                            <div className="flex items-center justify-between text-xs text-gray-700 dark:text-gray-300">
+                              <div>
+                                <p className="font-medium">Assistant Smart Ringtone (multi-parties)</p>
+                                <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                                  Détecte automatiquement les silences et permet de garder plusieurs
+                                  parties distinctes.
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                className="min-h-[32px] text-[11px] px-3"
+                                onClick={() => handleAnalyzeExistingSmart(ringtone)}
+                                isLoading={isSmartOptimizing && smartSourceRingtoneId === ringtone.id}
+                                disabled={isSmartOptimizing && smartSourceRingtoneId === ringtone.id}
+                              >
+                                Analyser
+                              </Button>
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="block text-[11px] font-medium text-gray-700 dark:text-gray-300">
+                                Seuil de volume (dB)
+                                <span className="ml-2 text-[11px] text-gray-500 dark:text-gray-400">
+                                  {silenceThresholdDb.toFixed(0)} dB
+                                </span>
+                              </label>
+                              <input
+                                type="range"
+                                min={-60}
+                                max={-10}
+                                step={1}
+                                value={silenceThresholdDb}
+                                onChange={(e) => setSilenceThresholdDb(parseInt(e.target.value, 10))}
+                                className="range-default"
+                              />
+                              <div className="flex justify-between text-[11px] text-gray-500 dark:text-gray-400">
+                                <span>-60 dB (très sensible)</span>
+                                <span>-10 dB (peu sensible)</span>
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <label className="block text-[11px] font-medium text-gray-700 dark:text-gray-300">
+                                Durée minimale du blanc (ms)
+                                <span className="ml-2 text-[11px] text-gray-500 dark:text-gray-400">
+                                  {minSilenceDurationMs} ms
+                                </span>
+                              </label>
+                              <input
+                                type="range"
+                                min={100}
+                                max={1000}
+                                step={50}
+                                value={minSilenceDurationMs}
+                                onChange={(e) => setMinSilenceDurationMs(parseInt(e.target.value, 10))}
+                                className="range-default"
+                              />
+                              <div className="flex justify-between text-[11px] text-gray-500 dark:text-gray-400">
+                                <span>100 ms (coupes fréquentes)</span>
+                                <span>1000 ms (coupes plus rares)</span>
+                              </div>
+                            </div>
+
+                            {smartSourceRingtoneId === ringtone.id && segments.length > 0 && (
+                              <div className="space-y-3">
+                                <div>
+                                  <p className="text-[11px] font-medium text-gray-700 dark:text-gray-300">
+                                    Choisissez quelle(s) partie(s) vous voulez garder
+                                  </p>
+                                  <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                                    Une nouvelle sonnerie sera créée pour chaque partie sélectionnée.
+                                  </p>
+                                </div>
+
+                                {/* Timeline globale */}
+                                <div className="w-full h-4 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden flex">
+                                  {segments.map((segment, index) => {
+                                    const total = ringtone.duration || segment.endSeconds;
+                                    const widthPercent =
+                                      total > 0 ? (segment.durationSeconds / total) * 100 : 0;
+                                    const isSelected = selectedSegmentIds.includes(segment.id);
+                                    const colors = [
+                                      'bg-blue-500',
+                                      'bg-green-500',
+                                      'bg-purple-500',
+                                      'bg-amber-500',
+                                      'bg-rose-500',
+                                    ];
+                                    const colorClass = colors[index % colors.length];
+                                    return (
+                                      <div
+                                        key={segment.id}
+                                        className={`relative h-full ${colorClass} ${
+                                          isSelected ? '' : 'opacity-40'
+                                        }`}
+                                        style={{ width: `${Math.max(widthPercent, 2)}%` }}
+                                      >
+                                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 text-[10px] font-semibold text-gray-800 dark:text-gray-100">
+                                          {segment.id}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+
+                                {/* Liste des segments + pré-écoute */}
+                                <div className="space-y-1 max-h-40 overflow-y-auto">
+                                  {segments.map((segment) => {
+                                    const startSec = Math.max(0, Math.floor(segment.startSeconds));
+                                    const endSec = Math.max(
+                                      startSec + 1,
+                                      Math.floor(segment.endSeconds),
+                                    );
+                                    const format = (sec: number) => {
+                                      const mins = Math.floor(sec / 60);
+                                      const secs = sec % 60;
+                                      return `${mins.toString().padStart(2, '0')}:${secs
+                                        .toString()
+                                        .padStart(2, '0')}`;
+                                    };
+                                    const isSelected = selectedSegmentIds.includes(segment.id);
+                                    return (
+                                      <label
+                                        key={segment.id}
+                                        className="flex items-center justify-between gap-2 text-[11px] px-2 py-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700/80 cursor-pointer"
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <input
+                                            type="checkbox"
+                                            checked={isSelected}
+                                            onChange={() => toggleSegmentSelection(segment.id)}
+                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                          />
+                                          <span className="font-medium">
+                                            Partie {segment.id}{' '}
+                                            <span className="font-normal text-gray-500 dark:text-gray-400">
+                                              ({format(startSec)} → {format(endSec)})
+                                            </span>
+                                          </span>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => playSmartSegment(segment.id)}
+                                          className="text-[11px] px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 min-h-[28px]"
+                                        >
+                                          Écouter
+                                        </button>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+
+                                {/* Prévisualisation générale pour les segments */}
+                                {smartSourceBlob && smartSourceRingtoneId === ringtone.id && (
+                                  <div className="space-y-2">
+                                    <audio
+                                      ref={smartPreviewRef}
+                                      controls
+                                      className="w-full"
+                                      src={URL.createObjectURL(smartSourceBlob)}
+                                    />
+                                    <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                                      Pré-écoute des différentes parties détectées.
+                                    </p>
+                                  </div>
+                                )}
+
+                                <div className="flex justify-end">
+                                  <Button
+                                    type="button"
+                                    variant="primary"
+                                    className="min-h-[32px] text-[11px] px-3"
+                                    onClick={() => handleCreateSegmentVersions(ringtone)}
+                                  >
+                                    💾 Créer une sonnerie par partie sélectionnée
+                  </Button>
                 </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </Card>
             ))}
           </div>
