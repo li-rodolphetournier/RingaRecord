@@ -7,7 +7,7 @@ interface LoopPointEditorProps {
   onSelectLoopPoint: (point: LoopPoint) => void;
   onCreateLoop: (beatsPerLoop: number) => void;
   isCreating: boolean;
-  bpm: number | null;
+  bpm: number;
 }
 
 const formatTime = (seconds: number): string => {
@@ -23,7 +23,6 @@ export const LoopPointEditor = ({
   onSelectLoopPoint,
   onCreateLoop,
   isCreating,
-  bpm,
 }: LoopPointEditorProps) => {
   return (
     <div className="space-y-4">

@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import { memo, type ButtonHTMLAttributes, type ReactNode } from 'react';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
@@ -6,7 +6,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   isLoading?: boolean;
 }
 
-export const Button = ({
+export const Button = memo(({
   children,
   variant = 'primary',
   isLoading = false,
@@ -40,5 +40,7 @@ export const Button = ({
       {isLoading ? 'Chargement...' : children}
     </button>
   );
-};
+});
+
+Button.displayName = 'Button';
 

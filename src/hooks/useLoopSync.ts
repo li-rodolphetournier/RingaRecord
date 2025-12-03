@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
-import { findLoopPoints, type LoopPoint } from '../services/audio/loopDetection.service';
-import { createSyncedLoop as createSyncedLoopService, type RhythmSyncOptions } from '../services/audio/rhythmSync.service';
-import type { SyncedLoopResult } from '../types/rhythm.types';
+import { findLoopPoints } from '../services/audio/loopDetection.service';
+import { createSyncedLoop as createSyncedLoopService } from '../services/audio/rhythmSync.service';
+import type { LoopPoint, RhythmSyncOptions } from '../types/rhythm.types';
 
 export interface UseLoopSyncState {
   isDetecting: boolean;
@@ -28,7 +28,6 @@ export function useLoopSync(): UseLoopSyncReturn {
   const [syncedBlob, setSyncedBlob] = useState<Blob | null>(null);
   const [durationSeconds, setDurationSeconds] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [sourceBlob, setSourceBlob] = useState<Blob | null>(null);
   const [sourceBpm, setSourceBpm] = useState<number | null>(null);
   const [sourceAudioBuffer, setSourceAudioBuffer] = useState<AudioBuffer | null>(null);
 
@@ -36,7 +35,6 @@ export function useLoopSync(): UseLoopSyncReturn {
     async (blob: Blob, bpm: number, beatsPerLoop: number = 4) => {
       setIsDetecting(true);
       setError(null);
-      setSourceBlob(blob);
       setSourceBpm(bpm);
 
       try {
@@ -123,7 +121,6 @@ export function useLoopSync(): UseLoopSyncReturn {
     setSyncedBlob(null);
     setDurationSeconds(null);
     setError(null);
-    setSourceBlob(null);
     setSourceBpm(null);
     setSourceAudioBuffer(null);
   }, []);

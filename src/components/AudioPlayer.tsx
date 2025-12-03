@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 
 interface AudioPlayerProps {
   src: string;
@@ -6,7 +6,7 @@ interface AudioPlayerProps {
   className?: string;
 }
 
-export const AudioPlayer = ({ src, title, className = '' }: AudioPlayerProps) => {
+export const AudioPlayer = memo(({ src, title, className = '' }: AudioPlayerProps) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -136,5 +136,7 @@ export const AudioPlayer = ({ src, title, className = '' }: AudioPlayerProps) =>
       </div>
     </div>
   );
-};
+});
+
+AudioPlayer.displayName = 'AudioPlayer';
 

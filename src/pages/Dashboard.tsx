@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useTransition } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { useAuthStore } from '../stores/authStore';
@@ -16,8 +16,9 @@ import { useEqualizer } from '../hooks/useEqualizer';
 import { buildRingtonesForSegments } from '../services/audio/ringtoneSegments.service';
 import { Equalizer } from '../components/audio/Equalizer';
 import { getRecommendedRingtoneFormat, getAvailableRingtoneFormats, getFormatLabel } from '../utils/ringtoneFormat';
-import { convertBlobToFormat, type RingtoneFormat } from '../services/audio/ringtoneConverter.service';
 import { ShareModal } from '../components/ShareModal';
+import { useRingtoneActions } from '../hooks/useRingtoneActions';
+import { formatDuration, formatSize } from '../utils/formatUtils';
 
 export const Dashboard = () => {
   const navigate = useNavigate();
@@ -26,9 +27,7 @@ export const Dashboard = () => {
     ringtones,
     fetchAll,
     isLoading,
-    delete: deleteRingtone,
     upload,
-    update: updateRingtone,
   } = useRingtoneStore();
   const [optimizingId, setOptimizingId] = useState<string | null>(null);
   const [trimRingtoneId, setTrimRingtoneId] = useState<string | null>(null);
@@ -85,6 +84,9 @@ export const Dashboard = () => {
     reset: resetEqualizer,
   } = useEqualizer();
 
+  const { handleDelete, handleRename, handleDownload, handleToggleProtection } = useRingtoneActions();
+  const [, startTransition] = useTransition();
+
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login');
@@ -99,43 +101,30 @@ export const Dashboard = () => {
     }
   }, [equalizerError]);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     logout();
     navigate('/login');
-  };
+  }, [logout, navigate]);
 
-  const handleStartRename = (ringtone: Ringtone) => {
+  const handleStartRename = useCallback((ringtone: Ringtone) => {
     setEditingTitleId(ringtone.id);
     setEditingTitleValue(ringtone.title);
-  };
+  }, []);
 
-  const handleCancelRename = () => {
+  const handleCancelRename = useCallback(() => {
     setEditingTitleId(null);
     setEditingTitleValue('');
-  };
+  }, []);
 
-  const handleConfirmRename = async (ringtone: Ringtone) => {
-    const nextTitle = editingTitleValue.trim();
-    if (!nextTitle) {
-      toast.error('Le titre ne peut pas être vide');
-      return;
-    }
-
-    if (nextTitle === ringtone.title) {
-      setEditingTitleId(null);
-      return;
-    }
-
-    try {
-      await updateRingtone(ringtone.id, { title: nextTitle });
-      toast.success('Titre mis à jour ✔️');
-      setEditingTitleId(null);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Impossible de renommer la sonnerie';
-      toast.error(message);
-    }
-  };
+  const handleConfirmRename = useCallback(
+    async (ringtone: Ringtone) => {
+      const success = await handleRename(ringtone, editingTitleValue);
+      if (success) {
+        setEditingTitleId(null);
+      }
+    },
+    [handleRename, editingTitleValue],
+  );
 
   // Réinitialiser l'assistant Smart lorsqu'on change de sonnerie en mode découpe
   useEffect(() => {
@@ -150,339 +139,281 @@ export const Dashboard = () => {
     setEqualizerSourceBlob(null);
   }, [equalizerRingtoneId, resetEqualizer]);
 
-  const formatDuration = (seconds: number) => {
-    return `${seconds}s`;
-  };
+  const handleOptimizeExisting = useCallback(
+    async (ringtone: Ringtone) => {
+      try {
+        startTransition(() => {
+          setOptimizingId(ringtone.id);
+        });
 
-  const formatSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
-  const handleDownload = async (ringtone: Ringtone, format?: RingtoneFormat) => {
-    try {
-      const response = await fetch(ringtone.fileUrl);
-      if (!response.ok) {
-        throw new Error('Erreur lors du téléchargement du fichier');
-      }
-      
-      let blob = await response.blob();
-      let finalFormat = format || (ringtone.format as RingtoneFormat);
-      let filename = `${ringtone.title}.${finalFormat}`;
-
-      // Si un format spécifique est demandé et différent du format original, convertir
-      if (format && format !== ringtone.format) {
-        try {
-          toast.info('Conversion en cours...', { autoClose: 2000 });
-          blob = await convertBlobToFormat(blob, { format, quality: 0.9 });
-          filename = `${ringtone.title}.${format}`;
-        } catch (conversionError) {
-          console.error('Erreur de conversion:', conversionError);
-          toast.warning('Conversion échouée, téléchargement du format original');
-          // Continuer avec le format original
-          finalFormat = ringtone.format as RingtoneFormat;
-          filename = `${ringtone.title}.${ringtone.format}`;
+        const response = await fetch(ringtone.fileUrl);
+        if (!response.ok) {
+          throw new Error('Erreur lors du téléchargement de la sonnerie à optimiser');
         }
+
+        const originalBlob = await response.blob();
+
+        const hasManualTrim = trimRingtoneId === ringtone.id && ringtone.duration > 1;
+        const options = hasManualTrim
+          ? {
+              manualStartSeconds: Math.max(0, Math.min(trimStart, ringtone.duration - 1)),
+              manualEndSeconds: Math.max(
+                Math.max(0, Math.min(trimStart + 1, ringtone.duration)),
+                Math.min(trimEnd || ringtone.duration, ringtone.duration),
+              ),
+            }
+          : undefined;
+
+        const { optimizedBlob, durationSeconds } = await optimizeRingtone(originalBlob, options);
+
+        const extension = ringtone.format;
+        const safeMimeType = optimizedBlob.type || 'audio/wav';
+        const baseTitle = `${ringtone.title} (opt)`;
+        const sanitizedTitle = baseTitle.trim().replace(/[^a-zA-Z0-9_-]+/g, '_') || 'ringtone_opt';
+        const filename = `${sanitizedTitle}.${extension}`;
+        const file = new File([optimizedBlob], filename, { type: safeMimeType });
+
+        const rawDuration = Number.isFinite(durationSeconds)
+          ? durationSeconds
+          : ringtone.duration;
+        const clampedDuration = Math.max(1, Math.min(40, Math.round(rawDuration)));
+
+        await upload(file, baseTitle, extension, clampedDuration);
+        toast.success(`Version optimisée créée : ${baseTitle}`);
+        await fetchAll();
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Impossible de créer la version optimisée';
+        toast.error(message);
+        // eslint-disable-next-line no-console
+        console.error('Erreur lors de la création de la version optimisée:', error);
+      } finally {
+        startTransition(() => {
+          setOptimizingId(null);
+        });
       }
+    },
+    [trimRingtoneId, trimStart, trimEnd, upload, fetchAll],
+  );
 
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      link.style.display = 'none';
-      
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      setTimeout(() => {
-        window.URL.revokeObjectURL(url);
-      }, 100);
+  const handleAnalyzeExistingSmart = useCallback(
+    async (ringtone: Ringtone) => {
+      try {
+        setSmartSourceRingtoneId(ringtone.id);
 
-      toast.success(`Téléchargement prêt : ${filename}`);
-    } catch (error) {
-      console.error('Erreur lors du téléchargement:', error);
-      toast.error('Téléchargement impossible, ouverture dans un nouvel onglet.');
-      window.open(ringtone.fileUrl, '_blank');
-    }
-  };
+        const response = await fetch(ringtone.fileUrl);
+        if (!response.ok) {
+          throw new Error('Erreur lors du téléchargement de la sonnerie à analyser');
+        }
 
-  const handleOptimizeExisting = async (ringtone: Ringtone) => {
-    try {
-      setOptimizingId(ringtone.id);
+        const originalBlob = await response.blob();
+        setSmartSourceBlob(originalBlob);
 
-      const response = await fetch(ringtone.fileUrl);
-      if (!response.ok) {
-        throw new Error('Erreur lors du téléchargement de la sonnerie à optimiser');
+        await optimizeSmart(originalBlob);
+        toast.success('Analyse des segments terminée ✔️');
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Impossible d\'analyser les segments';
+        toast.error(message);
+        // eslint-disable-next-line no-console
+        console.error('Erreur lors de l\'analyse des segments existants:', error);
       }
+    },
+    [optimizeSmart],
+  );
 
-      const originalBlob = await response.blob();
+  const handleAnalyzeSpectrumForEqualizer = useCallback(
+    async (ringtone: Ringtone) => {
+      try {
+        setEqualizerRingtoneId(ringtone.id);
 
-      const hasManualTrim = trimRingtoneId === ringtone.id && ringtone.duration > 1;
-      const options = hasManualTrim
-        ? {
-            manualStartSeconds: Math.max(0, Math.min(trimStart, ringtone.duration - 1)),
-            manualEndSeconds: Math.max(
-              Math.max(0, Math.min(trimStart + 1, ringtone.duration)),
-              Math.min(trimEnd || ringtone.duration, ringtone.duration),
-            ),
-          }
-        : undefined;
+        const response = await fetch(ringtone.fileUrl);
+        if (!response.ok) {
+          throw new Error('Erreur lors du téléchargement de la sonnerie à analyser');
+        }
 
-      const { optimizedBlob, durationSeconds } = await optimizeRingtone(originalBlob, options);
+        const originalBlob = await response.blob();
+        setEqualizerSourceBlob(originalBlob);
 
-      const extension = ringtone.format;
-      const safeMimeType = optimizedBlob.type || 'audio/wav';
-      const baseTitle = `${ringtone.title} (opt)`;
-      const sanitizedTitle = baseTitle.trim().replace(/[^a-zA-Z0-9_-]+/g, '_') || 'ringtone_opt';
-      const filename = `${sanitizedTitle}.${extension}`;
-      const file = new File([optimizedBlob], filename, { type: safeMimeType });
-
-      const rawDuration = Number.isFinite(durationSeconds)
-        ? durationSeconds
-        : ringtone.duration;
-      const clampedDuration = Math.max(1, Math.min(40, Math.round(rawDuration)));
-
-      await upload(file, baseTitle, extension, clampedDuration);
-      toast.success(`Version optimisée créée : ${baseTitle}`);
-      await fetchAll();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Impossible de créer la version optimisée';
-      toast.error(message);
-      console.error('Erreur lors de la création de la version optimisée:', error);
-    } finally {
-      setOptimizingId(null);
-    }
-  };
-
-  const handleAnalyzeExistingSmart = async (ringtone: Ringtone) => {
-    try {
-      setSmartSourceRingtoneId(ringtone.id);
-
-      const response = await fetch(ringtone.fileUrl);
-      if (!response.ok) {
-        throw new Error('Erreur lors du téléchargement de la sonnerie à analyser');
+        await analyzeAndSuggest(originalBlob);
+        toast.success('Analyse spectrale terminée ✔️');
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Impossible d'analyser le spectre";
+        toast.error(message);
+        // eslint-disable-next-line no-console
+        console.error('Erreur lors de l\'analyse spectrale:', error);
       }
+    },
+    [analyzeAndSuggest],
+  );
 
-      const originalBlob = await response.blob();
-      setSmartSourceBlob(originalBlob);
-
-      await optimizeSmart(originalBlob);
-      toast.success('Analyse des segments terminée ✔️');
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Impossible d\'analyser les segments';
-      toast.error(message);
-      console.error('Erreur lors de l\'analyse des segments existants:', error);
-    }
-  };
-
-  const handleAnalyzeSpectrumForEqualizer = async (ringtone: Ringtone) => {
-    try {
-      setEqualizerRingtoneId(ringtone.id);
-
-      const response = await fetch(ringtone.fileUrl);
-      if (!response.ok) {
-        throw new Error('Erreur lors du téléchargement de la sonnerie à analyser');
-      }
-
-      const originalBlob = await response.blob();
-      setEqualizerSourceBlob(originalBlob);
-
-      await analyzeAndSuggest(originalBlob);
-      toast.success('Analyse spectrale terminée ✔️');
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Impossible d'analyser le spectre";
-      toast.error(message);
-      console.error('Erreur lors de l\'analyse spectrale:', error);
-    }
-  };
-
-  const handlePreviewEqualizerForExisting = async (ringtone: Ringtone, preset: typeof selectedPreset) => {
-    if (!equalizerSourceBlob || equalizerRingtoneId !== ringtone.id) {
-      toast.error('Analyse spectrale requise avant la prévisualisation');
-      return;
-    }
-
-    try {
-      await previewPreset(equalizerSourceBlob, preset);
-    } catch {
-      // L'erreur est déjà gérée dans le hook
-    }
-  };
-
-  const handleApplyEqualizerToExisting = async (ringtone: Ringtone) => {
-    if (!equalizerSourceBlob || equalizerRingtoneId !== ringtone.id) {
-      toast.error('Analyse spectrale requise avant l\'application de l\'égaliseur');
-      return;
-    }
-
-    try {
-      await applyPreset(equalizerSourceBlob, selectedPreset);
-
-      if (!equalizedBlob) {
-        toast.error('Erreur lors de l\'application de l\'égaliseur');
+  const handlePreviewEqualizerForExisting = useCallback(
+    async (ringtone: Ringtone, preset: typeof selectedPreset) => {
+      if (!equalizerSourceBlob || equalizerRingtoneId !== ringtone.id) {
+        toast.error('Analyse spectrale requise avant la prévisualisation');
         return;
       }
 
-      const extension = ringtone.format;
-      const safeMimeType = equalizedBlob.type || 'audio/wav';
-      const baseTitle = `${ringtone.title} (égalisé)`;
-      const sanitizedTitle = baseTitle.trim().replace(/[^a-zA-Z0-9_-]+/g, '_') || 'ringtone_eq';
-      const filename = `${sanitizedTitle}.${extension}`;
-      const file = new File([equalizedBlob], filename, { type: safeMimeType });
+      try {
+        await previewPreset(equalizerSourceBlob, preset);
+      } catch {
+        // L'erreur est déjà gérée dans le hook
+      }
+    },
+    [equalizerSourceBlob, equalizerRingtoneId, previewPreset],
+  );
 
-      const rawDuration = durationSeconds !== null && Number.isFinite(durationSeconds)
-        ? durationSeconds
-        : ringtone.duration;
-      const clampedDuration = Math.max(1, Math.min(40, Math.round(rawDuration)));
-
-      await upload(file, baseTitle, extension, clampedDuration);
-      toast.success(`Version égalisée créée : ${baseTitle}`);
-      await fetchAll();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Impossible de créer la version égalisée';
-      toast.error(message);
-      console.error('Erreur lors de la création de la version égalisée:', error);
-    }
-  };
-
-  const handleCreateSegmentVersions = async (ringtone: Ringtone) => {
-    if (!smartSourceBlob || smartSourceRingtoneId !== ringtone.id) {
-      toast.error('Analyse des segments requise avant la création par parties');
-      return;
-    }
-
-    if (segments.length === 0 || selectedSegmentIds.length === 0) {
-      toast.error('Sélectionnez au moins une partie à garder');
-      return;
-    }
-
-    try {
-      const extension = ringtone.format;
-      const safeMimeType = 'audio/wav';
-      const baseTitle = `${ringtone.title}`;
-      const sanitizedTitle =
-        baseTitle.trim().replace(/[^a-zA-Z0-9_-]+/g, '_') || 'ringtone_part';
-
-      const selectedSegments = segments.filter((segment) =>
-        selectedSegmentIds.includes(segment.id),
-      );
-
-      const builtRingtones = await buildRingtonesForSegments(smartSourceBlob, selectedSegments);
-
-      for (const built of builtRingtones) {
-        let finalDuration = built.durationSeconds;
-
-        if (!Number.isFinite(finalDuration) || finalDuration < 1) {
-          // eslint-disable-next-line no-continue
-          continue;
-        }
-
-        if (finalDuration > 40) {
-          finalDuration = 40;
-        }
-
-        finalDuration = Math.round(finalDuration);
-
-        const partTitle = `${ringtone.title} (partie ${built.segmentId})`;
-        const filename = `${sanitizedTitle}_partie_${built.segmentId}.${extension}`;
-        const file = new File([built.blob], filename, { type: safeMimeType });
-
-        await upload(file, partTitle, extension, finalDuration);
+  const handleApplyEqualizerToExisting = useCallback(
+    async (ringtone: Ringtone) => {
+      if (!equalizerSourceBlob || equalizerRingtoneId !== ringtone.id) {
+        toast.error('Analyse spectrale requise avant l\'application de l\'égaliseur');
+        return;
       }
 
-      toast.success('Sonneries par partie créées ✔️');
-      await fetchAll();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Impossible de créer les sonneries par partie';
-      toast.error(message);
-      console.error('Erreur lors de la création par parties:', error);
-    }
-  };
+      try {
+        // Utiliser directement le service pour éviter le double traitement
+        // Le hook applyPreset() appelle aussi applyEqualizerPresetToBlob, ce qui serait redondant
+        const { applyEqualizerPresetToBlob } = await import('../services/audio/equalizer.service');
+        const result = await applyEqualizerPresetToBlob(equalizerSourceBlob, selectedPreset);
 
-  const deleteWithToast = async (ringtone: Ringtone, closeToast?: () => void) => {
-    try {
-      await deleteRingtone(ringtone.id);
-      closeToast?.();
-      toast.success('Sonnerie supprimée');
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Impossible de supprimer la sonnerie';
-      closeToast?.();
-      toast.error(message);
-    }
-  };
+        const extension = ringtone.format;
+        const safeMimeType = result.equalizedBlob.type || 'audio/wav';
+        const baseTitle = `${ringtone.title} (égalisé)`;
+        const sanitizedTitle = baseTitle.trim().replace(/[^a-zA-Z0-9_-]+/g, '_') || 'ringtone_eq';
+        const filename = `${sanitizedTitle}.${extension}`;
+        const file = new File([result.equalizedBlob], filename, { type: safeMimeType });
 
-  const handleToggleProtection = async (ringtone: Ringtone) => {
-    try {
-      await updateRingtone(ringtone.id, { isProtected: !ringtone.isProtected });
-      toast.success(
-        ringtone.isProtected
-          ? 'Protection désactivée'
-          : 'Sonnerie protégée contre la suppression ⭐',
-      );
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Impossible de modifier la protection';
-      toast.error(message);
-    }
-  };
+        const rawDuration = result.durationSeconds !== null && Number.isFinite(result.durationSeconds)
+          ? result.durationSeconds
+          : ringtone.duration;
+        const clampedDuration = Math.max(1, Math.min(40, Math.round(rawDuration)));
 
-  const handleDelete = (ringtone: Ringtone) => {
-    if (ringtone.isProtected) {
-      toast.warning(
-        'Cette sonnerie est protégée. Désactivez la protection (⭐) avant de pouvoir la supprimer.',
-        {
-          autoClose: 5000,
-        },
-      );
-      return;
-    }
+        await upload(file, baseTitle, extension, clampedDuration);
+        toast.success(`Version égalisée créée : ${baseTitle}`);
+        await fetchAll();
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Impossible de créer la version égalisée';
+        toast.error(message);
+        // eslint-disable-next-line no-console
+        console.error('Erreur lors de la création de la version égalisée:', error);
+      }
+    },
+    [equalizerSourceBlob, equalizerRingtoneId, selectedPreset, upload, fetchAll],
+  );
 
-    toast.info(({ closeToast }) => (
-      <div className="space-y-3">
-        <p className="font-semibold text-gray-900 dark:text-gray-100">
-          Supprimer « {ringtone.title} » ?
-        </p>
-        <p className="text-sm text-gray-600 dark:text-gray-300">
-          Cette action est définitive.
-        </p>
-        <div className="flex gap-2">
-          <Button
-            variant="danger"
-            className="flex-1"
-            onClick={() => deleteWithToast(ringtone, closeToast)}
-          >
-            Supprimer
-          </Button>
-          <Button variant="secondary" className="flex-1" onClick={closeToast}>
-            Annuler
-          </Button>
+  const handleCreateSegmentVersions = useCallback(
+    async (ringtone: Ringtone) => {
+      if (!smartSourceBlob || smartSourceRingtoneId !== ringtone.id) {
+        toast.error('Analyse des segments requise avant la création par parties');
+        return;
+      }
+
+      if (segments.length === 0 || selectedSegmentIds.length === 0) {
+        toast.error('Sélectionnez au moins une partie à garder');
+        return;
+      }
+
+      try {
+        const extension = ringtone.format;
+        const safeMimeType = 'audio/wav';
+        const baseTitle = `${ringtone.title}`;
+        const sanitizedTitle =
+          baseTitle.trim().replace(/[^a-zA-Z0-9_-]+/g, '_') || 'ringtone_part';
+
+        const selectedSegments = segments.filter((segment) =>
+          selectedSegmentIds.includes(segment.id),
+        );
+
+        const builtRingtones = await buildRingtonesForSegments(smartSourceBlob, selectedSegments);
+
+        for (const built of builtRingtones) {
+          let finalDuration = built.durationSeconds;
+
+          if (!Number.isFinite(finalDuration) || finalDuration < 1) {
+            // eslint-disable-next-line no-continue
+            continue;
+          }
+
+          if (finalDuration > 40) {
+            finalDuration = 40;
+          }
+
+          finalDuration = Math.round(finalDuration);
+
+          const partTitle = `${ringtone.title} (partie ${built.segmentId})`;
+          const filename = `${sanitizedTitle}_partie_${built.segmentId}.${extension}`;
+          const file = new File([built.blob], filename, { type: safeMimeType });
+
+          await upload(file, partTitle, extension, finalDuration);
+        }
+
+        toast.success('Sonneries par partie créées ✔️');
+        await fetchAll();
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : 'Impossible de créer les sonneries par partie';
+        toast.error(message);
+        // eslint-disable-next-line no-console
+        console.error('Erreur lors de la création par parties:', error);
+      }
+    },
+    [smartSourceBlob, smartSourceRingtoneId, segments, selectedSegmentIds, upload, fetchAll],
+  );
+
+  const handleDeleteClick = useCallback(
+    (ringtone: Ringtone) => {
+      if (ringtone.isProtected) {
+        toast.warning(
+          'Cette sonnerie est protégée. Désactivez la protection (⭐) avant de pouvoir la supprimer.',
+          {
+            autoClose: 5000,
+          },
+        );
+        return;
+      }
+
+      toast.info(({ closeToast }) => (
+        <div className="space-y-3">
+          <p className="font-semibold text-gray-900 dark:text-gray-100">
+            Supprimer « {ringtone.title} » ?
+          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            Cette action est définitive.
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant="danger"
+              className="flex-1"
+              onClick={() => handleDelete(ringtone, closeToast)}
+            >
+              Supprimer
+            </Button>
+            <Button variant="secondary" className="flex-1" onClick={closeToast}>
+              Annuler
+            </Button>
+          </div>
         </div>
-      </div>
-    ), {
-      autoClose: false,
-      closeOnClick: false,
-      draggable: false,
-      position: 'top-center',
-    });
-  };
+      ), {
+        autoClose: false,
+        closeOnClick: false,
+        draggable: false,
+        position: 'top-center',
+      });
+    },
+    [handleDelete],
+  );
 
-  const handleShare = (ringtone: Ringtone) => {
+  const handleShare = useCallback((ringtone: Ringtone) => {
     setShareRingtone(ringtone);
     setShareModalOpen(true);
-  };
+  }, []);
 
-  const handleCloseShareModal = () => {
+  const handleCloseShareModal = useCallback(() => {
     setShareModalOpen(false);
     setShareRingtone(null);
-  };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -717,7 +648,7 @@ export const Dashboard = () => {
                             <span className="truncate">Partager</span>
                           </Button>
                           <Button
-                            onClick={() => handleDelete(ringtone)}
+                            onClick={() => handleDeleteClick(ringtone)}
                             variant="danger"
                             className="flex-1 min-h-[36px] text-[11px] !rounded-xl px-2 py-1.5 min-w-0"
                             disabled={ringtone.isProtected}

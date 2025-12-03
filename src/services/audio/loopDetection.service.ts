@@ -30,6 +30,7 @@ export async function findLoopPoints(
     secondsPerMeasure,
     minLoopDuration,
     maxLoopDuration,
+    beatsPerLoop,
   );
 
   // 3. Évaluer chaque candidat
@@ -43,6 +44,7 @@ export async function findLoopPoints(
       return {
         ...candidate,
         quality,
+        measureCount: candidate.beatsCount / beatsPerLoop,
       };
     }),
   );
@@ -61,6 +63,7 @@ function generateLoopCandidates(
   secondsPerMeasure: number,
   minDuration: number,
   maxDuration: number,
+  beatsPerLoop: number,
 ): Array<{ startSeconds: number; endSeconds: number; beatsCount: number }> {
   const candidates: Array<{ startSeconds: number; endSeconds: number; beatsCount: number }> = [];
   const totalDuration = audioBuffer.duration;
@@ -70,7 +73,7 @@ function generateLoopCandidates(
 
   for (const measureCount of measureCounts) {
     const loopDuration = secondsPerMeasure * measureCount;
-    const beatsCount = measureCount * 4; // 4 beats par mesure
+    const beatsCount = measureCount * beatsPerLoop;
 
     if (loopDuration < minDuration || loopDuration > maxDuration) {
       continue;
@@ -186,4 +189,3 @@ function testContinuity(audioBuffer: AudioBuffer, startSample: number, endSample
   // Score : 1 = parfait, 0 = très mauvais
   return Math.max(0, 1 - diff / maxAmplitude);
 }
-
