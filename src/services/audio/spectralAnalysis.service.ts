@@ -147,6 +147,33 @@ function suggestPreset(
     return 'warm';
   }
 
+  // Si énergie rock (basses et aigus élevés), suggérer Rock
+  if (bassEnergy > 0.35 && trebleEnergy > 0.3 && midEnergy < 0.4) {
+    return 'rock';
+  }
+
+  // Si énergie pop (équilibré avec voix), suggérer Pop
+  if (midEnergy > 0.4 && bassEnergy > 0.25 && trebleEnergy > 0.25) {
+    return 'pop';
+  }
+
+  // Si énergie jazz (médiums riches), suggérer Jazz
+  if (midEnergy > 0.45 && bassEnergy > 0.25 && trebleEnergy < 0.3) {
+    return 'jazz';
+  }
+
+  // Si énergie classique (équilibré), suggérer Classical
+  if (
+    bassEnergy > 0.25 &&
+    bassEnergy < 0.4 &&
+    midEnergy > 0.25 &&
+    midEnergy < 0.4 &&
+    trebleEnergy > 0.25 &&
+    trebleEnergy < 0.4
+  ) {
+    return 'classical';
+  }
+
   // Par défaut, pas d'égalisation
   return 'none';
 }

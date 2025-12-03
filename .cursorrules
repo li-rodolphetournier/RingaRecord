@@ -80,6 +80,22 @@ rules:
       - "format-validation: required"
       - "zod-schema: preferred"
 
+  - id: use-context7-mcp
+    description: "Toujours utiliser Context7 MCP pour documentation et meilleures pratiques des bibliothèques."
+    match: "always"
+    enforce:
+      - "always-use-context7: true"
+      - "context7-libraries: |
+          - React: use library /facebook/react
+          - TypeScript: use library /microsoft/TypeScript
+          - Vite: use library /vitejs/vite
+          - Supabase: use library /supabase/supabase
+          - Web Audio API: use context7 for Web Audio API documentation
+          - Zustand: use library /pmndrs/zustand
+          - Vitest: use library /vitest-dev/vitest"
+      - "auto-invoke-context7: true"
+      - "context7-prompt: 'Always use Context7 MCP tools when generating code, looking up documentation, or implementing features. Automatically invoke Context7 for React, TypeScript, Vite, Supabase, Web Audio API, and other library-specific queries without explicit user request.'"
+
 preferences:
   code-style:
     indent: 2

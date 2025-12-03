@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { EqualizerPreset } from '../../types/equalizer.types';
 import { EQUALIZER_PRESETS } from '../../services/audio/equalizer.service';
 import { Button } from '../ui/Button';
@@ -8,8 +8,11 @@ interface EqualizerProps {
   onPresetChange: (preset: EqualizerPreset) => void;
   onAnalyze: () => void;
   onApply: () => void;
+  onPreview?: (preset: EqualizerPreset) => void;
   isAnalyzing: boolean;
   isProcessing: boolean;
+  isPreviewing?: boolean;
+  previewBlob?: Blob | null;
   analysisResult: {
     suggestedPreset: EqualizerPreset;
     confidence: number;
@@ -24,11 +27,16 @@ export const Equalizer = ({
   onPresetChange,
   onAnalyze,
   onApply,
+  onPreview,
   isAnalyzing,
   isProcessing,
+  isPreviewing = false,
+  previewBlob = null,
   analysisResult,
 }: EqualizerProps) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   // Dessiner la courbe de réponse fréquentielle
   useEffect(() => {
@@ -135,6 +143,41 @@ export const Equalizer = ({
     ctx.fillText('-20 dB', 5, height - 5);
   }, [selectedPreset]);
 
+  // Gérer l'URL de prévisualisation
+  useEffect(() => {
+    if (previewBlob) {
+      const url = URL.createObjectURL(previewBlob);
+      setPreviewUrl(url);
+      return () => {
+        URL.revokeObjectURL(url);
+        setPreviewUrl(null);
+      };
+    } else {
+      setPreviewUrl(null);
+    }
+  }, [previewBlob]);
+
+  // Arrêter la prévisualisation quand le preset change
+  useEffect(() => {
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+      previewAudioRef.current.currentTime = 0;
+    }
+  }, [selectedPreset]);
+
+  const handlePreview = () => {
+    if (onPreview && selectedPreset !== 'none') {
+      onPreview(selectedPreset);
+    }
+  };
+
+  const handleStopPreview = () => {
+    if (previewAudioRef.current) {
+      previewAudioRef.current.pause();
+      previewAudioRef.current.currentTime = 0;
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
@@ -208,17 +251,56 @@ export const Equalizer = ({
         </div>
       </div>
 
-      {/* Bouton d'application */}
-      <Button
-        type="button"
-        variant="primary"
-        onClick={onApply}
-        isLoading={isProcessing}
-        disabled={isProcessing || selectedPreset === 'none'}
-        className="w-full min-h-[44px]"
-      >
-        ✨ Appliquer l'égalisation
-      </Button>
+      {/* Prévisualisation audio */}
+      {onPreview && previewUrl && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+              Prévisualisation
+            </p>
+            <button
+              type="button"
+              onClick={handleStopPreview}
+              className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+            >
+              Arrêter
+            </button>
+          </div>
+          <audio
+            ref={previewAudioRef}
+            src={previewUrl}
+            controls
+            className="w-full h-10"
+            onEnded={handleStopPreview}
+          />
+        </div>
+      )}
+
+      {/* Boutons d'action */}
+      <div className="flex gap-2">
+        {onPreview && selectedPreset !== 'none' && (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handlePreview}
+            isLoading={isPreviewing}
+            disabled={isPreviewing || isProcessing}
+            className="flex-1 min-h-[44px]"
+          >
+            🎵 Prévisualiser
+          </Button>
+        )}
+        <Button
+          type="button"
+          variant="primary"
+          onClick={onApply}
+          isLoading={isProcessing}
+          disabled={isProcessing || selectedPreset === 'none'}
+          className="flex-1 min-h-[44px]"
+        >
+          ✨ Appliquer
+        </Button>
+      </div>
     </div>
   );
 };

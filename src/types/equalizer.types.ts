@@ -2,7 +2,16 @@
  * Types pour l'égaliseur audio
  */
 
-export type EqualizerPreset = 'none' | 'bass-boost' | 'vocal-clarity' | 'bright' | 'warm';
+export type EqualizerPreset =
+  | 'none'
+  | 'bass-boost'
+  | 'vocal-clarity'
+  | 'bright'
+  | 'warm'
+  | 'rock'
+  | 'pop'
+  | 'jazz'
+  | 'classical';
 
 export interface EqualizerBand {
   /** Fréquence centrale en Hz */

@@ -23,6 +23,15 @@ dist-ssr
 *.sln
 *.sw?
 
+# Cursor configuration and documentation
+.cursor/
+CONTEXT7_INSTALLATION_GUIDE.md
+CONTEXT7_SETUP.md
+DOCUMENTATION_EQUALIZER.md
+INSTALL_CONTEXT7_MAINTENANT.md
+PLAN_RHYTHM_SYNC.md
+QUICK_START_CONTEXT7.md
+
 # Environment variables
 .env
 .env.local

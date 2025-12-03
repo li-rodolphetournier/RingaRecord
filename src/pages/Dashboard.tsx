@@ -71,13 +71,16 @@ export const Dashboard = () => {
   const {
     isProcessing: isEqualizing,
     isAnalyzing: isAnalyzingSpectrum,
+    isPreviewing: isPreviewingEqualizer,
     equalizedBlob,
+    previewBlob: equalizerPreviewBlob,
     durationSeconds,
     selectedPreset,
     analysisResult,
     error: equalizerError,
     applyPreset,
     analyzeAndSuggest,
+    previewPreset,
     setPreset,
     reset: resetEqualizer,
   } = useEqualizer();
@@ -295,6 +298,19 @@ export const Dashboard = () => {
         error instanceof Error ? error.message : "Impossible d'analyser le spectre";
       toast.error(message);
       console.error('Erreur lors de l\'analyse spectrale:', error);
+    }
+  };
+
+  const handlePreviewEqualizerForExisting = async (ringtone: Ringtone, preset: typeof selectedPreset) => {
+    if (!equalizerSourceBlob || equalizerRingtoneId !== ringtone.id) {
+      toast.error('Analyse spectrale requise avant la prévisualisation');
+      return;
+    }
+
+    try {
+      await previewPreset(equalizerSourceBlob, preset);
+    } catch {
+      // L'erreur est déjà gérée dans le hook
     }
   };
 
@@ -977,8 +993,11 @@ export const Dashboard = () => {
                                     onPresetChange={setPreset}
                                     onAnalyze={() => handleAnalyzeSpectrumForEqualizer(ringtone)}
                                     onApply={() => handleApplyEqualizerToExisting(ringtone)}
+                                    onPreview={(preset) => handlePreviewEqualizerForExisting(ringtone, preset)}
                                     isAnalyzing={isAnalyzingSpectrum}
                                     isProcessing={isEqualizing}
+                                    isPreviewing={isPreviewingEqualizer}
+                                    previewBlob={equalizerPreviewBlob}
                                     analysisResult={analysisResult}
                                   />
                                 ) : (
@@ -1454,8 +1473,11 @@ export const Dashboard = () => {
                                   onPresetChange={setPreset}
                                   onAnalyze={() => handleAnalyzeSpectrumForEqualizer(ringtone)}
                                   onApply={() => handleApplyEqualizerToExisting(ringtone)}
+                                  onPreview={(preset) => handlePreviewEqualizerForExisting(ringtone, preset)}
                                   isAnalyzing={isAnalyzingSpectrum}
                                   isProcessing={isEqualizing}
+                                  isPreviewing={isPreviewingEqualizer}
+                                  previewBlob={equalizerPreviewBlob}
                                   analysisResult={analysisResult}
                                 />
                               ) : (

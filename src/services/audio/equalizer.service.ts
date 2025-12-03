@@ -62,6 +62,52 @@ export const EQUALIZER_PRESETS: Record<EqualizerPreset, EqualizerPresetConfig> =
       { frequency: 8000, gain: -2, q: 1.0 }, // Réduit légèrement les aigus
     ],
   },
+  rock: {
+    id: 'rock',
+    name: 'Rock',
+    description: 'Égalisation optimisée pour musique rock (basses et aigus renforcés)',
+    bands: [
+      { frequency: 80, gain: 5, q: 1.2 },
+      { frequency: 200, gain: 3, q: 1.0 },
+      { frequency: 3000, gain: 2, q: 1.5 },
+      { frequency: 6000, gain: 4, q: 1.5 },
+      { frequency: 10000, gain: 3, q: 1.0 },
+    ],
+  },
+  pop: {
+    id: 'pop',
+    name: 'Pop',
+    description: 'Égalisation pour musique pop (voix claire, basses présentes)',
+    bands: [
+      { frequency: 100, gain: 3, q: 1.0 },
+      { frequency: 250, gain: 2, q: 0.8 },
+      { frequency: 2000, gain: 4, q: 2.0 },
+      { frequency: 5000, gain: 3, q: 1.5 },
+      { frequency: 12000, gain: 2, q: 1.0 },
+    ],
+  },
+  jazz: {
+    id: 'jazz',
+    name: 'Jazz',
+    description: 'Égalisation chaleureuse pour jazz (médiums riches, aigus doux)',
+    bands: [
+      { frequency: 150, gain: 3, q: 1.0 },
+      { frequency: 500, gain: 4, q: 1.0 },
+      { frequency: 1500, gain: 3, q: 1.5 },
+      { frequency: 8000, gain: -1, q: 1.0 },
+    ],
+  },
+  classical: {
+    id: 'classical',
+    name: 'Classical',
+    description: 'Égalisation pour musique classique (équilibre naturel, aigus clairs)',
+    bands: [
+      { frequency: 200, gain: 2, q: 1.0 },
+      { frequency: 1000, gain: 1, q: 1.0 },
+      { frequency: 5000, gain: 2, q: 1.5 },
+      { frequency: 10000, gain: 3, q: 1.0 },
+    ],
+  },
 };
 
 /**

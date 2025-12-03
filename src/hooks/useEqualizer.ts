@@ -6,7 +6,9 @@ import type { SpectralAnalysisResult, EqualizerPreset } from '../types/equalizer
 export interface UseEqualizerState {
   isProcessing: boolean;
   isAnalyzing: boolean;
+  isPreviewing: boolean;
   equalizedBlob: Blob | null;
+  previewBlob: Blob | null;
   durationSeconds: number | null;
   selectedPreset: EqualizerPreset;
   analysisResult: SpectralAnalysisResult | null;
@@ -16,14 +18,18 @@ export interface UseEqualizerState {
 export interface UseEqualizerReturn extends UseEqualizerState {
   applyPreset: (blob: Blob, preset: EqualizerPreset) => Promise<void>;
   analyzeAndSuggest: (blob: Blob) => Promise<void>;
+  previewPreset: (blob: Blob, preset: EqualizerPreset) => Promise<void>;
   setPreset: (preset: EqualizerPreset) => void;
   reset: () => void;
+  clearPreview: () => void;
 }
 
 export const useEqualizer = (): UseEqualizerReturn => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isPreviewing, setIsPreviewing] = useState(false);
   const [equalizedBlob, setEqualizedBlob] = useState<Blob | null>(null);
+  const [previewBlob, setPreviewBlob] = useState<Blob | null>(null);
   const [durationSeconds, setDurationSeconds] = useState<number | null>(null);
   const [selectedPreset, setSelectedPreset] = useState<EqualizerPreset>('none');
   const [analysisResult, setAnalysisResult] = useState<SpectralAnalysisResult | null>(null);
@@ -71,26 +77,60 @@ export const useEqualizer = (): UseEqualizerReturn => {
     setSelectedPreset(preset);
   }, []);
 
+  const previewPreset = useCallback(async (blob: Blob, preset: EqualizerPreset) => {
+    if (preset === 'none') {
+      setPreviewBlob(null);
+      setIsPreviewing(false);
+      return;
+    }
+
+    setIsPreviewing(true);
+    setError(null);
+
+    try {
+      const result = await applyEqualizerPresetToBlob(blob, preset);
+      setPreviewBlob(result.equalizedBlob);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Erreur lors de la prévisualisation de l'égaliseur";
+      setError(message);
+      setPreviewBlob(null);
+    } finally {
+      setIsPreviewing(false);
+    }
+  }, []);
+
+  const clearPreview = useCallback(() => {
+    setPreviewBlob(null);
+    setIsPreviewing(false);
+  }, []);
+
   const reset = useCallback(() => {
     setEqualizedBlob(null);
+    setPreviewBlob(null);
     setDurationSeconds(null);
     setSelectedPreset('none');
     setAnalysisResult(null);
     setError(null);
+    setIsPreviewing(false);
   }, []);
 
   return {
     isProcessing,
     isAnalyzing,
+    isPreviewing,
     equalizedBlob,
+    previewBlob,
     durationSeconds,
     selectedPreset,
     analysisResult,
     error,
     applyPreset,
     analyzeAndSuggest,
+    previewPreset,
     setPreset,
     reset,
+    clearPreview,
   };
 };
 

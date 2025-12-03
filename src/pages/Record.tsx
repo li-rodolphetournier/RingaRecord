@@ -7,8 +7,10 @@ import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { useSmartRingtone } from '../hooks/useSmartRingtone';
 import { useBPMDetection } from '../hooks/useBPMDetection';
 import { useEqualizer } from '../hooks/useEqualizer';
+import { useLoopSync } from '../hooks/useLoopSync';
 import { buildRingtonesForSegments } from '../services/audio/ringtoneSegments.service';
 import { Equalizer } from '../components/audio/Equalizer';
+import { LoopPointEditor } from '../components/audio/LoopPointEditor';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
@@ -70,15 +72,31 @@ export const Record = () => {
   const {
     isProcessing: isEqualizing,
     isAnalyzing: isAnalyzingSpectrum,
+    isPreviewing: isPreviewingEqualizer,
     equalizedBlob,
+    previewBlob: equalizerPreviewBlob,
     selectedPreset,
     analysisResult,
     error: equalizerError,
     applyPreset,
     analyzeAndSuggest,
+    previewPreset,
     setPreset,
     reset: resetEqualizer,
   } = useEqualizer();
+
+  const {
+    isDetecting: isDetectingLoops,
+    isCreating: isCreatingLoop,
+    loopPoints,
+    selectedLoopPoint,
+    syncedBlob,
+    error: loopSyncError,
+    detectLoops,
+    createSyncedLoop,
+    selectLoopPoint,
+    reset: resetLoopSync,
+  } = useLoopSync();
 
   // Détecter le support navigateur
   const browserSupport = useMemo(() => getBrowserSupport(), []);
@@ -158,6 +176,12 @@ export const Record = () => {
       toast.error(equalizerError);
     }
   }, [equalizerError]);
+
+  useEffect(() => {
+    if (loopSyncError) {
+      toast.error(loopSyncError);
+    }
+  }, [loopSyncError]);
 
   useEffect(() => {
     if (bpmError) {
@@ -297,6 +321,20 @@ export const Record = () => {
     }
   };
 
+  const handlePreviewEqualizer = async (preset: typeof selectedPreset) => {
+    const baseBlob = lastOriginalBlob ?? getAudioBlob();
+    if (!baseBlob) {
+      toast.error('Aucun enregistrement disponible pour prévisualisation');
+      return;
+    }
+
+    try {
+      await previewPreset(baseBlob, preset);
+    } catch {
+      // L'erreur est déjà gérée dans le hook
+    }
+  };
+
   const handleApplyEqualizer = async () => {
     const baseBlob = lastOriginalBlob ?? getAudioBlob();
     if (!baseBlob) {
@@ -326,10 +364,42 @@ export const Record = () => {
         minBPM: 60,
         maxBPM: 200,
       });
+      // Réinitialiser la synchronisation rythmique quand on détecte un nouveau BPM
+      resetLoopSync();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Erreur lors de la détection du BPM';
       toast.error(message);
+    }
+  };
+
+  const handleDetectLoops = async () => {
+    if (!bpmResult) {
+      toast.error('Détectez d\'abord le BPM avant de chercher les points de boucle');
+      return;
+    }
+
+    const baseBlob = lastOriginalBlob ?? getAudioBlob();
+    if (!baseBlob) {
+      toast.error('Aucun enregistrement disponible');
+      return;
+    }
+
+    try {
+      await detectLoops(baseBlob, bpmResult.bpm, 4);
+      toast.success('Points de boucle détectés ✔️');
+    } catch {
+      // L'erreur est déjà gérée dans le hook
+    }
+  };
+
+  const handleCreateSyncedLoop = async (beatsPerLoop: number) => {
+    try {
+      await createSyncedLoop(beatsPerLoop, 50);
+      setUseOptimizedVersion(false); // Utiliser la version bouclée
+      toast.success('Boucle synchronisée créée ✔️');
+    } catch {
+      // L'erreur est déjà gérée dans le hook
     }
   };
 
@@ -394,13 +464,15 @@ export const Record = () => {
         return;
       }
 
-      // Cas standard : une seule sonnerie (originale, optimisée ou égalisée, avec ou sans découpe manuelle)
+      // Cas standard : une seule sonnerie (originale, optimisée, égalisée ou bouclée, avec ou sans découpe manuelle)
       const baseBlob =
-        useOptimizedVersion && equalizedBlob
-          ? equalizedBlob
-          : useOptimizedVersion && optimizedBlob
-            ? optimizedBlob
-            : getAudioBlob();
+        useOptimizedVersion && syncedBlob
+          ? syncedBlob
+          : useOptimizedVersion && equalizedBlob
+            ? equalizedBlob
+            : useOptimizedVersion && optimizedBlob
+              ? optimizedBlob
+              : getAudioBlob();
 
       if (!baseBlob) {
         toast.error('Aucun enregistrement disponible');
@@ -784,8 +856,11 @@ export const Record = () => {
                       onPresetChange={setPreset}
                       onAnalyze={handleAnalyzeSpectrum}
                       onApply={handleApplyEqualizer}
+                      onPreview={handlePreviewEqualizer}
                       isAnalyzing={isAnalyzingSpectrum}
                       isProcessing={isEqualizing}
+                      isPreviewing={isPreviewingEqualizer}
+                      previewBlob={equalizerPreviewBlob}
                       analysisResult={analysisResult}
                     />
                   </div>
@@ -814,31 +889,75 @@ export const Record = () => {
                   </div>
 
                   {bpmResult && (
-                    <div className="text-xs text-gray-700 dark:text-gray-300 mt-2 flex items-center justify-between gap-2">
-                      <div>
-                        <p className="font-medium">
-                          BPM détecté :{' '}
-                          <span className="font-mono">
-                            {Math.round(bpmResult.bpm)}
-                          </span>
-                        </p>
-                        <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                          Confiance : {(bpmResult.confidence * 100).toFixed(0)}% · Méthode :{' '}
-                          {bpmResult.method === 'autocorrelation' ? 'Autocorrélation' : 'Énergie'}
-                        </p>
+                    <>
+                      <div className="text-xs text-gray-700 dark:text-gray-300 mt-2 flex items-center justify-between gap-2">
+                        <div>
+                          <p className="font-medium">
+                            BPM détecté :{' '}
+                            <span className="font-mono">
+                              {Math.round(bpmResult.bpm)}
+                            </span>
+                          </p>
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                            Confiance : {(bpmResult.confidence * 100).toFixed(0)}% · Méthode :{' '}
+                            {bpmResult.method === 'autocorrelation' ? 'Autocorrélation' : 'Énergie'}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={resetBPM}
+                          className="text-[11px] px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600 min-h-[28px]"
+                        >
+                          Réinitialiser
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={resetBPM}
-                        className="text-[11px] px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600 min-h-[28px]"
-                      >
-                        Réinitialiser
-                      </button>
-                    </div>
+
+                      {/* Synchronisation Rythmique */}
+                      <div className="space-y-3 border-t border-gray-200 dark:border-gray-700 pt-3 mt-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <h4 className="text-xs font-semibold text-gray-900 dark:text-gray-100">
+                              Synchronisation Rythmique
+                            </h4>
+                            <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                              Créez une sonnerie qui boucle parfaitement sans coupure
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={handleDetectLoops}
+                            isLoading={isDetectingLoops}
+                            disabled={isDetectingLoops}
+                            className="text-xs min-h-[32px]"
+                          >
+                            🔄 Détecter les boucles
+                          </Button>
+                        </div>
+
+                        {loopPoints.length > 0 && (
+                          <LoopPointEditor
+                            loopPoints={loopPoints}
+                            selectedLoopPoint={selectedLoopPoint}
+                            onSelectLoopPoint={selectLoopPoint}
+                            onCreateLoop={handleCreateSyncedLoop}
+                            isCreating={isCreatingLoop}
+                            bpm={bpmResult.bpm}
+                          />
+                        )}
+
+                        {loopPoints.length === 0 && !isDetectingLoops && (
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                            Cliquez sur "🔄 Détecter les boucles" pour trouver les meilleurs points de boucle
+                            synchronisés sur le tempo.
+                          </p>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
 
-                {(lastOriginalBlob || optimizedBlob || equalizedBlob) && (
+                {(lastOriginalBlob || optimizedBlob || equalizedBlob || syncedBlob) && (
                   <>
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
@@ -859,8 +978,8 @@ export const Record = () => {
                         <button
                           type="button"
                           onClick={() => {
-                            if (!optimizedBlob && !equalizedBlob) {
-                              toast.info('Clique sur ✨ Optimiser ou appliquez un égaliseur');
+                            if (!optimizedBlob && !equalizedBlob && !syncedBlob) {
+                              toast.info('Clique sur ✨ Optimiser, appliquez un égaliseur ou créez une boucle');
                               return;
                             }
                             setUseOptimizedVersion(true);
@@ -871,7 +990,7 @@ export const Record = () => {
                               : 'text-gray-500 dark:text-gray-300'
                           }`}
                         >
-                          {equalizedBlob ? 'Égalisée' : 'Optimisée'}
+                          {syncedBlob ? 'Bouclée' : equalizedBlob ? 'Égalisée' : 'Optimisée'}
                         </button>
                       </div>
                     </div>
@@ -883,11 +1002,13 @@ export const Record = () => {
                         className="w-full"
                         src={
                           useOptimizedVersion
-                            ? equalizedBlob
-                              ? URL.createObjectURL(equalizedBlob)
-                              : optimizedBlob
-                                ? URL.createObjectURL(optimizedBlob)
-                                : undefined
+                            ? syncedBlob
+                              ? URL.createObjectURL(syncedBlob)
+                              : equalizedBlob
+                                ? URL.createObjectURL(equalizedBlob)
+                                : optimizedBlob
+                                  ? URL.createObjectURL(optimizedBlob)
+                                  : undefined
                             : lastOriginalBlob
                               ? URL.createObjectURL(lastOriginalBlob)
                               : undefined
@@ -895,11 +1016,13 @@ export const Record = () => {
                       />
                       <p className="text-[11px] text-gray-500 dark:text-gray-400">
                         {useOptimizedVersion
-                          ? equalizedBlob
-                            ? `Lecture de la version égalisée (preset: ${selectedPreset}).`
-                            : optimizedBlob
-                              ? 'Lecture de la version optimisée (WAV normalisée avec fade).'
-                              : 'Aucune version traitée disponible.'
+                          ? syncedBlob
+                            ? 'Lecture de la version bouclée synchronisée (boucle parfaite).'
+                            : equalizedBlob
+                              ? `Lecture de la version égalisée (preset: ${selectedPreset}).`
+                              : optimizedBlob
+                                ? 'Lecture de la version optimisée (WAV normalisée avec fade).'
+                                : 'Aucune version traitée disponible.'
                           : 'Lecture de la version originale brute.'}
                       </p>
                     </div>

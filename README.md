@@ -45,7 +45,7 @@ supabase/
 ├── migrations/           # SQL à exécuter dans Supabase
 │   ├── 001_create_ringtones_table.sql
 │   ├── 002_create_storage_bucket.sql
-│   └── 003_add_is_protected_column.sql  # Migration pour protection
+│   └── 003_add_is_protected_column.sql  # Migration pour protection (is_protected)
 └── README.md             # Rappels de configuration
 ```
 
@@ -92,7 +92,8 @@ supabase/
   - Bouton **"🎵 Détecter le BPM"** pour analyser le tempo de l'enregistrement.
   - Détection automatique du BPM (60-200 BPM) avec score de confiance.
   - Affichage du BPM détecté, de la méthode utilisée (autocorrélation) et du niveau de confiance.
-  - Préparation pour la synchronisation rythmique et création de boucles parfaites (à venir).
+  - Utilise l'**autocorrélation** pour détecter la périodicité dans le signal audio.
+  - Préparation pour la **synchronisation rythmique** et création de boucles parfaites (voir `PLAN_RHYTHM_SYNC.md`).
 
 ### Sur la page **Dashboard** (sonneries existantes)
 
@@ -163,37 +164,61 @@ Pour chaque carte de sonnerie :
 
 ### Version actuelle
 
-- ✅ **Égaliseur Audio avec Presets Intelligents**
-  - 4 presets prédéfinis (Bass Boost, Vocal Clarity, Bright, Warm)
-  - Analyse spectrale automatique pour suggestion de preset
-  - Visualisation graphique de la courbe de réponse fréquentielle
-  - Disponible sur nouvelles sonneries (Record) et sonneries existantes (Dashboard)
+- ✅ **🎚️ Égaliseur Audio avec Presets Intelligents**
+  - 4 presets prédéfinis : **Bass Boost**, **Vocal Clarity**, **Bright**, **Warm**
+  - **Analyse spectrale automatique** : bouton "🔍 Analyser" pour suggérer le meilleur preset
+  - **Visualisation graphique** : courbe de réponse fréquentielle en temps réel (Canvas)
+  - **Application en un clic** : traitement audio professionnel avec Web Audio API `BiquadFilterNode`
+  - Disponible sur **nouvelles sonneries** (page Record) et **sonneries existantes** (Dashboard)
+  - Crée une nouvelle version avec suffixe "(égalisé)" après application
 
-- ✅ **Détection Automatique de BPM** (Expérimental)
-  - Détection du tempo (60-200 BPM) via autocorrélation
-  - Affichage du BPM avec score de confiance
-  - Préparation pour synchronisation rythmique et boucles parfaites
+- ✅ **🎵 Détection Automatique de BPM** (Expérimental)
+  - Détection du tempo (60-200 BPM) via **autocorrélation**
+  - Affichage du BPM détecté avec **score de confiance** (0-100%)
+  - Méthode utilisée : autocorrélation pour détecter la périodicité
+  - Disponible sur la page **Record** pour nouvelles sonneries
+  - Préparation pour **synchronisation rythmique** et création de boucles parfaites (à venir)
 
-- ✅ **Mode Protection avec Étoile**
-  - Protection contre la suppression accidentelle
-  - Étoile jaune/gris pour activation/désactivation
-  - Blocage de la suppression pour sonneries protégées
+- ✅ **⭐ Mode Protection avec Étoile**
+  - **Étoile cliquable** à côté du titre pour activer/désactiver la protection
+  - **Étoile jaune** = sonnerie protégée, **grise** = non protégée
+  - **Blocage de suppression** : les sonneries protégées ne peuvent pas être supprimées
+  - Message d'avertissement si tentative de suppression d'une sonnerie protégée
+  - Colonne `is_protected` dans la base de données (migration `003_add_is_protected_column.sql`)
+
+### En développement
+
+- 🔄 **Synchronisation Rythmique et Création de Boucles Parfaites**
+  - Détection automatique de points de boucle optimaux basés sur la phase audio
+  - Création de sonneries qui bouclent sans coupure audible
+  - Alignement sur grille rythmique (beats)
+  - Application de crossfade pour transition fluide
+  - Options : 1, 2, 4, 8 mesures par boucle
+  - Voir `PLAN_RHYTHM_SYNC.md` pour le plan détaillé
 
 ### À venir
 
-- 🔄 Synchronisation rythmique et création de boucles parfaites
-- 🎨 Visualiseur de waveform interactif
-- 📊 Statistiques d'utilisation
+- 🎨 Visualiseur de waveform interactif avec édition directe
+- 📊 Statistiques d'utilisation et analytics audio
+- 🌐 Partage social et galerie communautaire
 
 ## 📱 Distribution mobile
 
 Consulte `GOOGLE_PLAY_SETUP.md` pour la configuration TWA / PWA et la publication sur le Play Store.
+
+## 📚 Documentation Technique
+
+- **`PLAN_BPM_DETECTION.md`** : Plan détaillé pour la détection de BPM
+- **`PLAN_RHYTHM_SYNC.md`** : Plan détaillé pour la synchronisation rythmique et création de boucles
+- **`FEATURES_PROPOSALS.md`** : 10 fonctionnalités proposées avec notation pertinence/difficulté
 
 ## 🤝 Contribution
 
 1. `git clone`
 2. `npm install`
 3. Créer un `.env` avec les clés Supabase
-4. Respecter les règles des `.cursorrules` (TypeScript strict, tests, mobile-first)
+4. Exécuter les migrations SQL dans Supabase (voir `supabase/migrations/`)
+5. Respecter les règles des `.cursorrules` (TypeScript strict, tests, mobile-first)
+6. Lancer les tests : `npm run test`
 
 Bonne création de sonneries ! 🎵
