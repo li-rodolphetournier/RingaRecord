@@ -69,7 +69,6 @@ export const useRingtoneActions = () => {
             blob = await convertBlobToFormat(blob, { format, quality: 0.9 });
             filename = `${ringtone.title}.${format}`;
           } catch (conversionError) {
-            // eslint-disable-next-line no-console
             console.error('Erreur de conversion:', conversionError);
             toast.warning('Conversion échouée, téléchargement du format original');
             // Continuer avec le format original
@@ -94,7 +93,6 @@ export const useRingtoneActions = () => {
 
         toast.success(`Téléchargement prêt : ${filename}`);
       } catch (error) {
-        // eslint-disable-next-line no-console
         console.error('Erreur lors du téléchargement:', error);
         toast.error('Téléchargement impossible, ouverture dans un nouvel onglet.');
         window.open(ringtone.fileUrl, '_blank');

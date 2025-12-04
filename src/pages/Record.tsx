@@ -279,12 +279,10 @@ export const Record = () => {
       // mais ici c'est appelé par un clic sur le bouton "Écouter".
       // On ajoute quand même un catch par sécurité.
       void audio.play().catch((error) => {
-        // eslint-disable-next-line no-console
         console.error('Impossible de lire le segment:', error);
         toast.error('Impossible de lire ce segment audio');
       });
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('Erreur de lecture du segment:', error);
       toast.error('Impossible de lire ce segment audio');
     }
@@ -455,7 +453,6 @@ export const Record = () => {
           if (!Number.isFinite(finalDuration) || finalDuration < 1) {
             // On ignore cette partie si la durée est invalide
             // et on passe à la suivante
-            // eslint-disable-next-line no-continue
             continue;
           }
 

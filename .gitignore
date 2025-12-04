@@ -25,13 +25,7 @@ dist-ssr
 
 # Cursor configuration and documentation
 .cursor/
-CONTEXT7_INSTALLATION_GUIDE.md
-CONTEXT7_SETUP.md
-DESIGN_SYSTEM.md
-DOCUMENTATION_EQUALIZER.md
-INSTALL_CONTEXT7_MAINTENANT.md
-PLAN_RHYTHM_SYNC.md
-QUICK_START_CONTEXT7.md
+docs/
 
 # Environment variables
 .env
@@ -39,7 +33,6 @@ QUICK_START_CONTEXT7.md
 .env.development.local
 .env.test.local
 .env.production.local
-SUPABASE_CREDENTIALS_TEMPLATE.md
 *.credentials
 
 # Supabase generated artifacts (handled outside repo)

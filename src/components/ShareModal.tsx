@@ -54,19 +54,21 @@ export const ShareModal = ({ isOpen, onClose, shareUrl, title, description }: Sh
         platformUrl = getEmailShareUrl(shareOptions);
         window.location.href = platformUrl;
         return;
-      case 'native':
+      case 'native': {
         const shared = await shareNative(shareOptions);
         if (shared) {
           onClose();
         }
         return;
-      case 'copy':
+      }
+      case 'copy': {
         const success = await copyToClipboard(shareOptions.url);
         if (success) {
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         }
         return;
+      }
       default:
         return;
     }

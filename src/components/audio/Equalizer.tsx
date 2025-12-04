@@ -147,13 +147,20 @@ export const Equalizer = ({
   useEffect(() => {
     if (previewBlob) {
       const url = URL.createObjectURL(previewBlob);
-      setPreviewUrl(url);
+      // Utiliser un callback pour éviter le warning setState dans effect
+      requestAnimationFrame(() => {
+        setPreviewUrl(url);
+      });
       return () => {
         URL.revokeObjectURL(url);
-        setPreviewUrl(null);
+        requestAnimationFrame(() => {
+          setPreviewUrl(null);
+        });
       };
     } else {
-      setPreviewUrl(null);
+      requestAnimationFrame(() => {
+        setPreviewUrl(null);
+      });
     }
   }, [previewBlob]);
 

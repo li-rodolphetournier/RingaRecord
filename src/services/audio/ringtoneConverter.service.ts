@@ -93,7 +93,6 @@ async function convertToMP3(
 ): Promise<Blob> {
   // Vérifier si lamejs est disponible
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const lamejs = await import('lamejs');
     const mp3encoder = new lamejs.Mp3Encoder(
       audioBuffer.numberOfChannels,

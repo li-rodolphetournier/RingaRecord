@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { analyzeSpectrum, analyzeSpectrumFromBlob } from './spectralAnalysis.service';
-import type { EqualizerPreset } from '../../types/equalizer.types';
 
 /**
  * Crée un AudioBuffer de test avec énergie concentrée dans une bande de fréquences
@@ -35,7 +34,6 @@ function createTestAudioBufferWithEnergy(params: {
   const trebleFreq = 8000;
 
   for (let i = 0; i < totalSamples; i++) {
-    const t = i / sampleRate;
     let sample = 0;
 
     // Ajoute composantes selon les énergies

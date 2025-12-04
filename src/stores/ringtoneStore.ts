@@ -7,6 +7,7 @@ interface RingtoneState {
   selectedRingtone: Ringtone | null;
   isLoading: boolean;
   error: string | null;
+  isFetching: boolean;
   fetchAll: () => Promise<void>;
   fetchById: (id: string) => Promise<void>;
   create: (dto: CreateRingtoneDto) => Promise<Ringtone>;
@@ -17,20 +18,28 @@ interface RingtoneState {
   clearSelected: () => void;
 }
 
-export const useRingtoneStore = create<RingtoneState>((set) => ({
+export const useRingtoneStore = create<RingtoneState>((set, get) => ({
   ringtones: [],
   selectedRingtone: null,
   isLoading: false,
   error: null,
+  isFetching: false,
 
   fetchAll: async () => {
-    set({ isLoading: true, error: null });
+    // Éviter les appels multiples simultanés
+    if (get().isFetching) {
+      return;
+    }
+
+    set({ isLoading: true, isFetching: true, error: null });
     try {
       const ringtones = await supabaseRingtonesService.getAll();
-      set({ ringtones, isLoading: false });
+      set({ ringtones, isLoading: false, isFetching: false });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch ringtones';
-      set({ error: message, isLoading: false });
+      set({ error: message, isLoading: false, isFetching: false });
+      // Log pour debug
+      console.error('Erreur lors du chargement des sonneries:', error);
     }
   },
 

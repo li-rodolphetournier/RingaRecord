@@ -175,7 +175,6 @@ export const RingtoneDetailsModal = ({ ringtone, isOpen, onClose }: RingtoneDeta
         const message =
           error instanceof Error ? error.message : 'Impossible de créer la version optimisée';
         toast.error(message);
-        // eslint-disable-next-line no-console
         console.error('Erreur lors de la création de la version optimisée:', error);
       } finally {
         startTransition(() => {
@@ -205,7 +204,6 @@ export const RingtoneDetailsModal = ({ ringtone, isOpen, onClose }: RingtoneDeta
         const message =
           error instanceof Error ? error.message : 'Impossible d\'analyser les segments';
         toast.error(message);
-        // eslint-disable-next-line no-console
         console.error('Erreur lors de l\'analyse des segments existants:', error);
       }
     },
@@ -231,7 +229,6 @@ export const RingtoneDetailsModal = ({ ringtone, isOpen, onClose }: RingtoneDeta
         const message =
           error instanceof Error ? error.message : "Impossible d'analyser le spectre";
         toast.error(message);
-        // eslint-disable-next-line no-console
         console.error('Erreur lors de l\'analyse spectrale:', error);
       }
     },
@@ -284,7 +281,6 @@ export const RingtoneDetailsModal = ({ ringtone, isOpen, onClose }: RingtoneDeta
         const message =
           error instanceof Error ? error.message : 'Impossible de créer la version égalisée';
         toast.error(message);
-        // eslint-disable-next-line no-console
         console.error('Erreur lors de la création de la version égalisée:', error);
       }
     },
@@ -320,7 +316,6 @@ export const RingtoneDetailsModal = ({ ringtone, isOpen, onClose }: RingtoneDeta
           let finalDuration = built.durationSeconds;
 
           if (!Number.isFinite(finalDuration) || finalDuration < 1) {
-            // eslint-disable-next-line no-continue
             continue;
           }
 
@@ -343,7 +338,6 @@ export const RingtoneDetailsModal = ({ ringtone, isOpen, onClose }: RingtoneDeta
         const message =
           error instanceof Error ? error.message : 'Impossible de créer les sonneries par partie';
         toast.error(message);
-        // eslint-disable-next-line no-console
         console.error('Erreur lors de la création par parties:', error);
       }
     },
@@ -412,7 +406,13 @@ export const RingtoneDetailsModal = ({ ringtone, isOpen, onClose }: RingtoneDeta
                   </h2>
                   <button
                     type="button"
-                    onClick={() => toggleFavorite(ringtone.id)}
+                    onClick={async () => {
+                      try {
+                        await toggleFavorite(ringtone.id);
+                      } catch {
+                        // L'erreur est déjà gérée dans le store
+                      }
+                    }}
                     className={`flex-shrink-0 transition-colors min-h-[28px] min-w-[28px] flex items-center justify-center rounded-full ${
                       isFavorite(ringtone.id)
                         ? 'text-pink-500 hover:text-pink-600 dark:text-pink-400 dark:hover:text-pink-300'

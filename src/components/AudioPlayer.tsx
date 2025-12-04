@@ -12,6 +12,7 @@ export const AudioPlayer = memo(({ src, title, className = '' }: AudioPlayerProp
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
+  const [hasError, setHasError] = useState(false);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -23,11 +24,23 @@ export const AudioPlayer = memo(({ src, title, className = '' }: AudioPlayerProp
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
 
+    const handleError = () => {
+      setHasError(true);
+      setIsPlaying(false);
+      console.warn('Erreur de chargement audio:', src);
+    };
+
+    const handleLoadStart = () => {
+      setHasError(false);
+    };
+
     audio.addEventListener('timeupdate', updateTime);
     audio.addEventListener('loadedmetadata', updateDuration);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('pause', handlePause);
+    audio.addEventListener('error', handleError);
+    audio.addEventListener('loadstart', handleLoadStart);
 
     return () => {
       audio.removeEventListener('timeupdate', updateTime);
@@ -35,8 +48,10 @@ export const AudioPlayer = memo(({ src, title, className = '' }: AudioPlayerProp
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
+      audio.removeEventListener('error', handleError);
+      audio.removeEventListener('loadstart', handleLoadStart);
     };
-  }, []);
+  }, [src]);
 
   const togglePlayPause = () => {
     const audio = audioRef.current;
@@ -82,7 +97,21 @@ export const AudioPlayer = memo(({ src, title, className = '' }: AudioPlayerProp
         </p>
       )}
       
-      <audio ref={audioRef} src={src} preload="metadata" crossOrigin="anonymous" />
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="metadata"
+        crossOrigin="anonymous"
+        onError={(e) => {
+          setHasError(true);
+          console.warn('Erreur de chargement audio:', src, e);
+        }}
+      />
+      {hasError && (
+        <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+          Erreur de chargement audio. Vérifiez votre connexion.
+        </p>
+      )}
 
       <div className="flex items-center gap-2 mb-2">
         <button
