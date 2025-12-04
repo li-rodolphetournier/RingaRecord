@@ -17,6 +17,8 @@ import { buildRingtonesForSegments } from '../services/audio/ringtoneSegments.se
 import { Equalizer } from '../components/audio/Equalizer';
 import { getRecommendedRingtoneFormat, getAvailableRingtoneFormats, getFormatLabel } from '../utils/ringtoneFormat';
 import { ShareModal } from '../components/ShareModal';
+import { useFavoritesStore } from '../stores/favoritesStore';
+import { useUiStore } from '../stores/uiStore';
 import { useRingtoneActions } from '../hooks/useRingtoneActions';
 import { formatDuration, formatSize } from '../utils/formatUtils';
 
@@ -60,6 +62,7 @@ export const Dashboard = () => {
   const {
     audioRef: smartPreviewRef,
     playSegment: playSmartSegment,
+    isPreparing: isPreparingSmartSegment,
   } = useSegmentPreview({
     segments,
     onError: (message) => {
@@ -83,6 +86,8 @@ export const Dashboard = () => {
 
   const { handleDelete, handleRename, handleDownload, handleToggleProtection } = useRingtoneActions();
   const [, startTransition] = useTransition();
+  const { isFavorite, toggleFavorite } = useFavoritesStore();
+  const { showDashboardRingtones, toggleShowDashboardRingtones } = useUiStore();
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -435,7 +440,33 @@ export const Dashboard = () => {
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
           Mes sonneries
         </h2>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <Button
+              type="button"
+              variant="secondary"
+              className="min-h-[32px] text-xs px-3 hidden sm:inline-flex"
+              onClick={() => navigate('/favorites')}
+              aria-label="Ouvrir la page des favoris"
+            >
+              <svg
+                className="w-4 h-4 mr-2 text-pink-500"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                xmlns="http://www.w3.org/2000/svg"
+                aria-hidden="true"
+              >
+                <path d="M12.001 21.35l-1.45-1.317C6.4 17.053 3 13.969 3 10.192 3 7.11 5.42 4.7 8.5 4.7c1.74 0 3.41.81 4.5 2.085C14.09 5.51 15.76 4.7 17.5 4.7 20.58 4.7 23 7.11 23 10.192c0 3.777-3.4 6.861-7.55 9.84l-1.45 1.317a1 1 0 01-1.35 0z" />
+              </svg>
+              <span>Favoris</span>
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              className="min-h-[32px] text-xs px-3"
+              onClick={toggleShowDashboardRingtones}
+            >
+              {showDashboardRingtones ? 'Masquer' : 'Afficher'} les favoris
+            </Button>
             <span className="text-sm text-gray-600 dark:text-gray-400">
               {viewMode === 'block' ? 'Bloc' : 'Paysage'}
             </span>
@@ -459,8 +490,8 @@ export const Dashboard = () => {
         </div>
 
         {isLoading ? (
-          <div className="text-center py-12">
-            <p className="text-gray-600 dark:text-gray-400">Chargement...</p>
+          <div className="flex items-center justify-center py-16 text-gray-600 dark:text-gray-400">
+            <span className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : ringtones.length === 0 ? (
           <Card>
@@ -475,7 +506,9 @@ export const Dashboard = () => {
           </Card>
         ) : (
           <div className={viewMode === 'block' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' : 'flex flex-col gap-4'}>
-            {ringtones.map((ringtone) => (
+            {ringtones
+              .filter((ringtone) => (showDashboardRingtones ? true : !isFavorite(ringtone.id)))
+              .map((ringtone) => (
               <Card key={ringtone.id} className={`hover:shadow-lg transition-shadow overflow-visible ${viewMode === 'landscape' ? 'flex flex-row gap-4 p-4' : ''}`}>
                 {viewMode === 'landscape' ? (
                   <>
@@ -514,9 +547,40 @@ export const Dashboard = () => {
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100 truncate min-w-0 flex-1">
-                        {ringtone.title}
-                      </h3>
+                          <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100 truncate min-w-0 flex-1">
+                  {ringtone.title}
+                </h3>
+                          <button
+                            type="button"
+                            onClick={() => toggleFavorite(ringtone.id)}
+                            className={`flex-shrink-0 transition-colors min-h-[28px] min-w-[28px] flex items-center justify-center rounded-full ${
+                              isFavorite(ringtone.id)
+                                ? 'text-pink-500 hover:text-pink-600 dark:text-pink-400 dark:hover:text-pink-300'
+                                : 'text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-300'
+                            }`}
+                            aria-label={
+                              isFavorite(ringtone.id)
+                                ? 'Retirer des favoris'
+                                : 'Ajouter aux favoris'
+                            }
+                          >
+                            <svg
+                              className="w-5 h-5"
+                              viewBox="0 0 24 24"
+                              fill={isFavorite(ringtone.id) ? 'currentColor' : 'none'}
+                              stroke="currentColor"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M11.995 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 
+                                4.42 3 7.5 3c1.74 0 3.41.81 4.495 2.09C13.09 3.81 14.76 3 16.5 3 
+                                19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.545 11.54l-1.46 1.31z"
+                              />
+                            </svg>
+                          </button>
                       <button
                         type="button"
                         onClick={() => handleToggleProtection(ringtone)}
@@ -533,17 +597,26 @@ export const Dashboard = () => {
                       >
                         <svg
                           className="w-5 h-5"
-                          fill={ringtone.isProtected ? 'currentColor' : 'none'}
+                          fill="none"
                           stroke="currentColor"
                           viewBox="0 0 24 24"
                           xmlns="http://www.w3.org/2000/svg"
                         >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
-                          />
+                          {ringtone.isProtected ? (
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M16.5 10.5V7.5a4.5 4.5 0 10-9 0v3M5.25 10.5h13.5A2.25 2.25 0 0121 12.75v6A2.25 2.25 0 0118.75 21h-13.5A2.25 2.25 0 013 18.75v-6A2.25 2.25 0 015.25 10.5z"
+                            />
+                          ) : (
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M7.5 10.5V7.5a4.5 4.5 0 118.91-0.75M5.25 10.5h13.5A2.25 2.25 0 0121 12.75v6A2.25 2.25 0 0118.75 21h-13.5A2.25 2.25 0 013 18.75v-6A2.25 2.25 0 015.25 10.5z"
+                            />
+                          )}
                         </svg>
                       </button>
                     </div>
@@ -994,6 +1067,37 @@ export const Dashboard = () => {
                 </h3>
                           <button
                             type="button"
+                            onClick={() => toggleFavorite(ringtone.id)}
+                            className={`flex-shrink-0 transition-colors min-h-[28px] min-w-[28px] flex items-center justify-center rounded-full ${
+                              isFavorite(ringtone.id)
+                                ? 'text-pink-500 hover:text-pink-600 dark:text-pink-400 dark:hover:text-pink-300'
+                                : 'text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-300'
+                            }`}
+                            aria-label={
+                              isFavorite(ringtone.id)
+                                ? 'Retirer des favoris'
+                                : 'Ajouter aux favoris'
+                            }
+                          >
+                            <svg
+                              className="w-5 h-5"
+                              viewBox="0 0 24 24"
+                              fill={isFavorite(ringtone.id) ? 'currentColor' : 'none'}
+                              stroke="currentColor"
+                              xmlns="http://www.w3.org/2000/svg"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M11.995 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 
+                                4.42 3 7.5 3c1.74 0 3.41.81 4.495 2.09C13.09 3.81 14.76 3 16.5 3 
+                                19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.545 11.54l-1.46 1.31z"
+                              />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => handleToggleProtection(ringtone)}
                             className={`flex-shrink-0 transition-colors min-h-[28px] min-w-[28px] flex items-center justify-center rounded-full ${
                               ringtone.isProtected
@@ -1008,17 +1112,26 @@ export const Dashboard = () => {
                           >
                             <svg
                               className="w-5 h-5"
-                              fill={ringtone.isProtected ? 'currentColor' : 'none'}
+                              fill="none"
                               stroke="currentColor"
                               viewBox="0 0 24 24"
                               xmlns="http://www.w3.org/2000/svg"
                             >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
-                              />
+                              {ringtone.isProtected ? (
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M16.5 10.5V7.5a4.5 4.5 0 10-9 0v3M5.25 10.5h13.5A2.25 2.25 0 0121 12.75v6A2.25 2.25 0 0118.75 21h-13.5A2.25 2.25 0 013 18.75v-6A2.25 2.25 0 015.25 10.5z"
+                                />
+                              ) : (
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M7.5 10.5V7.5a4.5 4.5 0 118.91-0.75M5.25 10.5h13.5A2.25 2.25 0 0121 12.75v6A2.25 2.25 0 0118.75 21h-13.5A2.25 2.25 0 013 18.75v-6A2.25 2.25 0 015.25 10.5z"
+                                />
+                              )}
                             </svg>
                           </button>
                         </div>
@@ -1356,9 +1469,22 @@ export const Dashboard = () => {
                                         <button
                                           type="button"
                                           onClick={() => playSmartSegment(segment.id)}
-                                          className="text-[11px] px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 min-h-[28px]"
+                                          disabled={
+                                            isSmartOptimizing ||
+                                            isPreparingSmartSegment ||
+                                            !smartSourceBlob ||
+                                            smartSourceRingtoneId !== ringtone.id
+                                          }
+                                          className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 min-h-[28px] disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
-                                          Écouter
+                                          {isSmartOptimizing || isPreparingSmartSegment ? (
+                                            <>
+                                              <span className="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                                              <span>Préparation…</span>
+                                            </>
+                                          ) : (
+                                            'Écouter'
+                                          )}
                                         </button>
                                       </label>
                                     );

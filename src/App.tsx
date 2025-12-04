@@ -10,6 +10,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 
 const Dashboard = lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.Dashboard })));
 const Record = lazy(() => import('./pages/Record').then((m) => ({ default: m.Record })));
+const Favorites = lazy(() => import('./pages/Favorites').then((m) => ({ default: m.Favorites })));
 
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuthStore();
@@ -78,6 +79,14 @@ function App() {
               element={
                 <PrivateRoute>
                   <Record />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/favorites"
+              element={
+                <PrivateRoute>
+                  <Favorites />
                 </PrivateRoute>
               }
             />

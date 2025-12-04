@@ -255,25 +255,38 @@ export const Record = () => {
     const segment = segments.find((s) => s.id === segmentId);
 
     if (!audio || !segment) {
-      toast.error("Impossible de lire ce segment audio");
+      toast.error('Impossible de lire ce segment audio');
       return;
     }
 
+    // Vérifier que les métadonnées audio sont disponibles
+    const hasValidDuration =
+      Number.isFinite(audio.duration) && typeof audio.duration === 'number' && audio.duration > 0;
+
+    if (!hasValidDuration) {
+      toast.info('Chargement de l’audio, réessayez dans un instant');
+      return;
+    }
+
+    // Empêcher de positionner currentTime en dehors de la durée réelle
+    const maxSafeStart = Math.max(0, audio.duration - 0.1);
+    const safeStart = Math.max(0, Math.min(segment.startSeconds, maxSafeStart));
+
     try {
       setActiveSegmentId(segmentId);
-      audio.currentTime = segment.startSeconds;
+      audio.currentTime = safeStart;
       // play() peut être rejeté sur certains navigateurs si pas déclenché par un geste utilisateur,
       // mais ici c'est appelé par un clic sur le bouton "Écouter".
       // On ajoute quand même un catch par sécurité.
       void audio.play().catch((error) => {
         // eslint-disable-next-line no-console
         console.error('Impossible de lire le segment:', error);
-        toast.error("Impossible de lire ce segment audio");
+        toast.error('Impossible de lire ce segment audio');
       });
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Erreur de lecture du segment:', error);
-      toast.error("Impossible de lire ce segment audio");
+      toast.error('Impossible de lire ce segment audio');
     }
   };
 
@@ -835,9 +848,20 @@ export const Record = () => {
                                 <button
                                   type="button"
                                   onClick={() => handlePlaySegment(segment.id)}
-                                  className="text-[11px] px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 min-h-[28px]"
+                                  disabled={
+                                    isOptimizing ||
+                                    (!lastOriginalBlob && !optimizedBlob && !equalizedBlob && !syncedBlob)
+                                  }
+                                  className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-full bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 min-h-[28px] disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                  Écouter
+                                  {isOptimizing ? (
+                                    <>
+                                      <span className="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                                      <span>Préparation…</span>
+                                    </>
+                                  ) : (
+                                    'Écouter'
+                                  )}
                                 </button>
                               </label>
                             );
