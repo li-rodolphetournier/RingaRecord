@@ -1,6 +1,7 @@
 import type { Ringtone } from '../../types/ringtone.types';
 import { Button } from '../ui/Button';
 import type { SmartRingtoneSegment } from '../../services/audio/smartRingtone.service';
+import { formatTime } from '../../utils/formatUtils';
 
 interface ExistingSmartAssistantProps {
   ringtone: Ringtone;
@@ -41,12 +42,6 @@ export const ExistingSmartAssistant = ({
   onPlaySegment,
   onCreateSegmentVersions,
 }: ExistingSmartAssistantProps) => {
-
-  const formatTime = (sec: number) => {
-    const mins = Math.floor(sec / 60);
-    const secs = sec % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
 
   return (
     <div className="space-y-3 border-t border-gray-200 dark:border-gray-700 pt-3 mt-2">

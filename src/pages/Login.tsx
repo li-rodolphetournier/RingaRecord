@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
 import { useAuthStore } from '../stores/authStore';
+import { useErrorHandler } from '../hooks/useErrorHandler';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
@@ -10,14 +10,15 @@ import { Card } from '../components/ui/Card';
 export const Login = () => {
   const navigate = useNavigate();
   const { login, isLoading, error, clearError } = useAuthStore();
+  const { showError, showSuccess } = useErrorHandler();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   useEffect(() => {
     if (error) {
-      toast.error(error);
+      showError(error);
     }
-  }, [error]);
+  }, [error, showError]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -25,7 +26,7 @@ export const Login = () => {
     
     try {
       await login({ email, password });
-      toast.success('Connexion réussie !');
+      showSuccess('Connexion réussie !');
       navigate('/dashboard');
     } catch {
       // Error is handled by the store

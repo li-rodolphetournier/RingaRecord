@@ -16,8 +16,10 @@ export const supabaseAuthService = {
       throw new Error('Login failed');
     }
 
+    // La session est déjà disponible dans data.session, pas besoin de la récupérer
     return {
       access_token: data.session.access_token,
+      session: data.session, // Retourner la session complète pour éviter un appel supplémentaire
     };
   },
 
@@ -47,6 +49,7 @@ export const supabaseAuthService = {
       if (sessionData?.session) {
         return {
           access_token: sessionData.session.access_token,
+          session: sessionData.session,
         };
       }
       
@@ -61,6 +64,7 @@ export const supabaseAuthService = {
 
     return {
       access_token: data.session.access_token,
+      session: data.session,
     };
   },
 

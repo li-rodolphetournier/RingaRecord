@@ -1,183 +1,31 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
-import { useAuthStore } from '../stores/authStore';
-import { useRingtoneStore } from '../stores/ringtoneStore';
-import { useFavoritesStore } from '../stores/favoritesStore';
-import type { Ringtone } from '../types/ringtone.types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { RingtoneDetailsModal } from '../components/RingtoneDetailsModal';
 import { FavoriteFolderModal } from '../components/favorites/FavoriteFolderModal';
 import { FavoritesRootList } from '../components/favorites/FavoritesRootList';
 import { FavoritesFoldersPanel } from '../components/favorites/FavoritesFoldersPanel';
-import { useFavoritesDnD } from '../hooks/useFavoritesDnD';
+import { useFavorites } from '../hooks/useFavorites';
 
 export const Favorites = () => {
-  const navigate = useNavigate();
-  const { isAuthenticated } = useAuthStore();
-  const { ringtones, fetchAll, isLoading } = useRingtoneStore();
   const {
-    rootIds,
-    folders,
-    isLoading: isLoadingFavorites,
-    load: loadFavorites,
+    setOpenFolderId,
+    selectedRingtone,
+    setSelectedRingtone,
+    isOverallLoading,
+    rootRingtones,
+    folderRingtones,
+    activeFolder,
     toggleFavorite,
-    createFolder,
-    renameFolder,
-    deleteFolder,
-    moveRingtone,
-    reorderContainer,
-  } = useFavoritesStore();
-
-  const isOverallLoading = isLoading || isLoadingFavorites;
-
-  const [openFolderId, setOpenFolderId] = useState<string | null>(null);
-  const [selectedRingtone, setSelectedRingtone] = useState<Ringtone | null>(null);
-
-  const { decodeDragPayload } = useFavoritesDnD();
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-      return;
-    }
-    void fetchAll();
-    void loadFavorites();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, navigate]);
-
-  const rootRingtones = useMemo(() => {
-    const map = new Map<string, Ringtone>(ringtones.map((r) => [r.id, r]));
-    return rootIds
-      .map((id) => map.get(id))
-      .filter((r): r is Ringtone => Boolean(r));
-  }, [rootIds, ringtones]);
-
-  const folderRingtones = useMemo(() => {
-    const map = new Map<string, Ringtone>(ringtones.map((r) => [r.id, r]));
-    return folders.map((folder) => ({
-      folderId: folder.id,
-      name: folder.name,
-      ringtones: folder.ringtoneIds
-        .map((id) => map.get(id))
-        .filter((r): r is Ringtone => Boolean(r)),
-    }));
-  }, [folders, ringtones]);
-
-  const handleCreateFolder = async (name: string) => {
-    try {
-      const folder = await createFolder(name);
-      toast.success(`Dossier « ${folder.name} » créé`);
-    } catch {
-      // L'erreur est déjà gérée dans le store
-    }
-  };
-
-  const handleRenameFolder = async (folderId: string, currentName: string) => {
-    const next = window.prompt('Nouveau nom du dossier', currentName);
-    if (!next) {
-      return;
-    }
-    try {
-      await renameFolder(folderId, next);
-      toast.success('Dossier renommé');
-    } catch {
-      // L'erreur est déjà gérée dans le store
-    }
-  };
-
-  const handleDeleteFolder = async (folderId: string) => {
-    const ok = window.confirm(
-      'Supprimer ce dossier ? Les sonneries resteront dans vos favoris (racine).',
-    );
-    if (!ok) {
-      return;
-    }
-    try {
-      await deleteFolder(folderId);
-      toast.success('Dossier supprimé (sonneries conservées dans les favoris)');
-    } catch {
-      // L'erreur est déjà gérée dans le store
-    }
-  };
-
-  const handleContainerDrop = async (
-    e: React.DragEvent<HTMLDivElement>,
-    targetContainerId: 'root' | string,
-  ) => {
-    e.preventDefault();
-    const raw = e.dataTransfer.getData('application/json');
-    const payload = decodeDragPayload(raw);
-    if (!payload) return;
-    try {
-      await moveRingtone(
-        payload.ringtoneId,
-        targetContainerId === 'root' ? null : targetContainerId,
-      );
-    } catch {
-      // L'erreur est déjà gérée dans le store
-    }
-  };
-
-  const handleItemDrop = async (
-    e: React.DragEvent<HTMLDivElement>,
-    targetContainerId: 'root' | string,
-    targetIndex: number,
-  ) => {
-    e.preventDefault();
-    const raw = e.dataTransfer.getData('application/json');
-    const payload = decodeDragPayload(raw);
-    if (!payload) return;
-    try {
-      await moveRingtone(
-        payload.ringtoneId,
-        targetContainerId === 'root' ? null : targetContainerId,
-        targetIndex,
-      );
-    } catch {
-      // L'erreur est déjà gérée dans le store
-    }
-  };
-
-  const handleReorderUp = async (containerId: 'root' | string, index: number) => {
-    const list =
-      containerId === 'root'
-        ? [...rootIds]
-        : [...(folders.find((f) => f.id === containerId)?.ringtoneIds ?? [])];
-    if (index <= 0 || index >= list.length) return;
-    const next = [...list];
-    const tmp = next[index - 1];
-    next[index - 1] = next[index];
-    next[index] = tmp;
-    try {
-      await reorderContainer(containerId, next);
-    } catch {
-      // L'erreur est déjà gérée dans le store
-    }
-  };
-
-  const handleReorderDown = async (containerId: 'root' | string, index: number) => {
-    const list =
-      containerId === 'root'
-        ? [...rootIds]
-        : [...(folders.find((f) => f.id === containerId)?.ringtoneIds ?? [])];
-    if (index < 0 || index >= list.length - 1) return;
-    const next = [...list];
-    const tmp = next[index + 1];
-    next[index + 1] = next[index];
-    next[index] = tmp;
-    try {
-      await reorderContainer(containerId, next);
-    } catch {
-      // L'erreur est déjà gérée dans le store
-    }
-  };
-
-  const activeFolder = useMemo(
-    () => folderRingtones.find((f) => f.folderId === openFolderId) ?? null,
-    [folderRingtones, openFolderId],
-  );
+    handleCreateFolder,
+    handleRenameFolder,
+    handleDeleteFolder,
+    handleContainerDrop,
+    handleItemDrop,
+    handleReorderUp,
+    handleReorderDown,
+    handleRemoveFromFolder,
+    navigate,
+  } = useFavorites();
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -249,13 +97,7 @@ export const Favorites = () => {
             onItemDrop={(folderId, e, index) => handleItemDrop(e, folderId, index)}
             onReorderUp={handleReorderUp}
             onReorderDown={handleReorderDown}
-            onRemoveFromFolder={async (ringtoneId) => {
-              try {
-                await moveRingtone(ringtoneId, null);
-              } catch {
-                // L'erreur est déjà gérée dans le store
-              }
-            }}
+            onRemoveFromFolder={handleRemoveFromFolder}
             onDetails={setSelectedRingtone}
           />
         </section>
@@ -266,13 +108,7 @@ export const Favorites = () => {
           folder={activeFolder}
           onClose={() => setOpenFolderId(null)}
           onRename={handleRenameFolder}
-          onRemoveFromFolder={async (ringtoneId) => {
-            try {
-              await moveRingtone(ringtoneId, null);
-            } catch {
-              // L'erreur est déjà gérée dans le store
-            }
-          }}
+          onRemoveFromFolder={handleRemoveFromFolder}
           onDetails={setSelectedRingtone}
         />
       )}

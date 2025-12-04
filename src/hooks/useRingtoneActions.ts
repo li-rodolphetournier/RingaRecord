@@ -1,34 +1,33 @@
 import { useCallback } from 'react';
-import { toast } from 'react-toastify';
 import { useRingtoneStore } from '../stores/ringtoneStore';
+import { useErrorHandler } from './useErrorHandler';
 import type { Ringtone } from '../types/ringtone.types';
 import type { RingtoneFormat } from '../services/audio/ringtoneConverter.service';
 import { convertBlobToFormat } from '../services/audio/ringtoneConverter.service';
 
 export const useRingtoneActions = () => {
   const { delete: deleteRingtone, update: updateRingtone } = useRingtoneStore();
+  const { handleError, showSuccess, showError, showWarning, showInfo } = useErrorHandler();
 
   const handleDelete = useCallback(
     async (ringtone: Ringtone, closeToast?: () => void) => {
       try {
         await deleteRingtone(ringtone.id);
         closeToast?.();
-        toast.success('Sonnerie supprimée');
+        showSuccess('Sonnerie supprimée');
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Impossible de supprimer la sonnerie';
         closeToast?.();
-        toast.error(message);
+        handleError(error, 'suppression sonnerie');
       }
     },
-    [deleteRingtone],
+    [deleteRingtone, showSuccess, handleError],
   );
 
   const handleRename = useCallback(
     async (ringtone: Ringtone, newTitle: string) => {
       const trimmedTitle = newTitle.trim();
       if (!trimmedTitle) {
-        toast.error('Le titre ne peut pas être vide');
+        showError('Le titre ne peut pas être vide');
         return false;
       }
 
@@ -38,16 +37,14 @@ export const useRingtoneActions = () => {
 
       try {
         await updateRingtone(ringtone.id, { title: trimmedTitle });
-        toast.success('Titre mis à jour ✔️');
+        showSuccess('Titre mis à jour ✔️');
         return true;
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Impossible de renommer la sonnerie';
-        toast.error(message);
+        handleError(error, 'renommage sonnerie');
         return false;
       }
     },
-    [updateRingtone],
+    [updateRingtone, showError, showSuccess, handleError],
   );
 
   const handleDownload = useCallback(
@@ -65,12 +62,12 @@ export const useRingtoneActions = () => {
         // Si un format spécifique est demandé et différent du format original, convertir
         if (format && format !== ringtone.format) {
           try {
-            toast.info('Conversion en cours...', { autoClose: 2000 });
+            showInfo('Conversion en cours...');
             blob = await convertBlobToFormat(blob, { format, quality: 0.9 });
             filename = `${ringtone.title}.${format}`;
           } catch (conversionError) {
             console.error('Erreur de conversion:', conversionError);
-            toast.warning('Conversion échouée, téléchargement du format original');
+            showWarning('Conversion échouée, téléchargement du format original');
             // Continuer avec le format original
             finalFormat = ringtone.format as RingtoneFormat;
             filename = `${ringtone.title}.${ringtone.format}`;
@@ -91,32 +88,30 @@ export const useRingtoneActions = () => {
           window.URL.revokeObjectURL(url);
         }, 100);
 
-        toast.success(`Téléchargement prêt : ${filename}`);
+        showSuccess(`Téléchargement prêt : ${filename}`);
       } catch (error) {
         console.error('Erreur lors du téléchargement:', error);
-        toast.error('Téléchargement impossible, ouverture dans un nouvel onglet.');
+        showError('Téléchargement impossible, ouverture dans un nouvel onglet.');
         window.open(ringtone.fileUrl, '_blank');
       }
     },
-    [],
+    [showSuccess, showError, showInfo, showWarning],
   );
 
   const handleToggleProtection = useCallback(
     async (ringtone: Ringtone) => {
       try {
         await updateRingtone(ringtone.id, { isProtected: !ringtone.isProtected });
-        toast.success(
+        showSuccess(
           ringtone.isProtected
             ? 'Protection désactivée'
             : 'Sonnerie protégée contre la suppression ⭐',
         );
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Impossible de modifier la protection';
-        toast.error(message);
+        handleError(error, 'modification protection');
       }
     },
-    [updateRingtone],
+    [updateRingtone, showSuccess, handleError],
   );
 
   return {

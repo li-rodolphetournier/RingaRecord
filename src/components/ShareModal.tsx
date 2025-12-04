@@ -1,17 +1,7 @@
-import { useState } from 'react';
 import type { MouseEvent } from 'react';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
-import {
-  getFacebookShareUrl,
-  getTwitterShareUrl,
-  getWhatsAppShareUrl,
-  getLinkedInShareUrl,
-  getEmailShareUrl,
-  copyToClipboard,
-  shareNative,
-  type ShareOptions,
-} from '../utils/share.utils';
+import { useShareModal } from '../hooks/useShareModal';
 
 export interface ShareModalProps {
   isOpen: boolean;
@@ -22,61 +12,16 @@ export interface ShareModalProps {
 }
 
 export const ShareModal = ({ isOpen, onClose, shareUrl, title, description }: ShareModalProps) => {
-  const [copied, setCopied] = useState(false);
+  const { copied, handleShare } = useShareModal({
+    shareUrl,
+    title,
+    description,
+    onClose,
+  });
 
   if (!isOpen) {
     return null;
   }
-
-  const shareOptions: ShareOptions = {
-    url: shareUrl,
-    title: title || 'Sonnerie RingaRecord',
-    description: description || 'Découvrez cette sonnerie créée avec RingaRecord!',
-  };
-
-  const handleShare = async (platform: string) => {
-    let platformUrl = '';
-
-    switch (platform) {
-      case 'facebook':
-        platformUrl = getFacebookShareUrl(shareOptions);
-        break;
-      case 'twitter':
-        platformUrl = getTwitterShareUrl(shareOptions);
-        break;
-      case 'whatsapp':
-        platformUrl = getWhatsAppShareUrl(shareOptions);
-        break;
-      case 'linkedin':
-        platformUrl = getLinkedInShareUrl(shareOptions);
-        break;
-      case 'email':
-        platformUrl = getEmailShareUrl(shareOptions);
-        window.location.href = platformUrl;
-        return;
-      case 'native': {
-        const shared = await shareNative(shareOptions);
-        if (shared) {
-          onClose();
-        }
-        return;
-      }
-      case 'copy': {
-        const success = await copyToClipboard(shareOptions.url);
-        if (success) {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        }
-        return;
-      }
-      default:
-        return;
-    }
-
-    if (platformUrl) {
-      window.open(platformUrl, '_blank', 'width=600,height=400');
-    }
-  };
 
   const socialNetworks = [
     {

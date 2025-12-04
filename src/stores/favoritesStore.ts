@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { supabaseFavoritesService } from '../services/supabase/favorites.service';
-import { toast } from 'react-toastify';
+import { handleError } from '../utils/errorUtils';
 
 interface FavoriteFolder {
   id: string;
@@ -97,7 +97,7 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
     } catch (error) {
       console.error('Erreur lors du chargement des favoris:', error);
       set({ isLoading: false });
-      toast.error('Impossible de charger les favoris');
+      handleError(new Error('Impossible de charger les favoris'), 'chargement favoris');
     }
   },
 
@@ -130,9 +130,7 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
       // Recharger depuis Supabase
       await get().load();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erreur lors de la modification des favoris';
-      console.error(message, error);
-      toast.error(message);
+      handleError(error, 'modification favoris');
       throw error;
     }
   },
@@ -156,9 +154,7 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
 
       return folderWithRingtoneIds;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erreur lors de la création du dossier';
-      console.error(message, error);
-      toast.error(message);
+      handleError(error, 'création dossier');
       throw error;
     }
   },
@@ -175,9 +171,7 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
       // Recharger depuis Supabase
       await get().load();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erreur lors du renommage du dossier';
-      console.error(message, error);
-      toast.error(message);
+      handleError(error, 'renommage dossier');
       throw error;
     }
   },
@@ -189,9 +183,7 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
       // Recharger depuis Supabase
       await get().load();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erreur lors de la suppression du dossier';
-      console.error(message, error);
-      toast.error(message);
+      handleError(error, 'suppression dossier');
       throw error;
     }
   },
@@ -231,9 +223,7 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
       // Recharger depuis Supabase
       await get().load();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erreur lors du déplacement de la sonnerie';
-      console.error(message, error);
-      toast.error(message);
+      handleError(error, 'déplacement sonnerie');
       throw error;
     }
   },
@@ -267,9 +257,7 @@ export const useFavoritesStore = create<FavoritesState>((set, get) => ({
       // Recharger depuis Supabase
       await get().load();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Erreur lors de la réorganisation';
-      console.error(message, error);
-      toast.error(message);
+      handleError(error, 'réorganisation favoris');
       throw error;
     }
   },

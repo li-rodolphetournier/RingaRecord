@@ -10,18 +10,25 @@ import { TrimControls } from './TrimControls';
 import { ExistingSmartAssistant } from './ExistingSmartAssistant';
 import { EqualizerSection } from './EqualizerSection';
 
-interface RingtoneCardProps {
-  ringtone: Ringtone;
-  viewMode: 'block' | 'landscape';
-  isFavorite: boolean;
-  isEditing: boolean;
-  editingValue: string;
-  isTrimOpen: boolean;
+/**
+ * Props pour la section Trim
+ */
+export interface TrimProps {
+  isOpen: boolean;
   trimStart: number;
   trimEnd: number;
   isOptimizing: boolean;
-  // Smart Ringtone props
-  isSmartAnalyzing: boolean;
+  onToggle: () => void;
+  onTrimStartChange: (value: number) => void;
+  onTrimEndChange: (value: number) => void;
+  onOptimize: () => void;
+}
+
+/**
+ * Props pour la section Smart Ringtone
+ */
+export interface SmartRingtoneProps {
+  isAnalyzing: boolean;
   segments: SmartRingtoneSegment[];
   selectedSegmentIds: number[];
   silenceThresholdDb: number;
@@ -29,92 +36,75 @@ interface RingtoneCardProps {
   smartSourceBlob: Blob | null;
   isPreparingSegment: boolean;
   smartPreviewAudioRef: React.RefObject<HTMLAudioElement | null>;
-  // Equalizer props
-  isEqualizerOpen: boolean;
-  selectedPreset: EqualizerPreset | null;
-  isAnalyzingSpectrum: boolean;
-  isEqualizing: boolean;
-  isPreviewingEqualizer: boolean;
-  equalizerPreviewBlob: Blob | null;
-  analysisResult: SpectralAnalysisResult | null;
-  // Callbacks
-  onToggleFavorite: () => void;
-  onToggleProtection: () => void;
-  onStartRename: () => void;
-  onCancelRename: () => void;
-  onConfirmRename: () => void;
-  onEditingValueChange: (value: string) => void;
-  onDownload: (format?: string) => void;
-  onToggleTrim: () => void;
-  onTrimStartChange: (value: number) => void;
-  onTrimEndChange: (value: number) => void;
-  onOptimizeWithTrim: () => void;
-  onShare: () => void;
-  onDelete: () => void;
-  // Smart Ringtone callbacks
-  onAnalyzeSmart: () => void;
+  onAnalyze: () => void;
   onSilenceThresholdChange: (value: number) => void;
   onMinSilenceDurationChange: (value: number) => void;
   onToggleSegmentSelection: (segmentId: number) => void;
   onPlaySegment: (segmentId: number) => void;
   onCreateSegmentVersions: () => void;
-  // Equalizer callbacks
-  onOpenEqualizer: () => void;
+}
+
+/**
+ * Props pour la section Equalizer
+ */
+export interface EqualizerProps {
+  isOpen: boolean;
+  selectedPreset: EqualizerPreset | null;
+  isAnalyzing: boolean;
+  isProcessing: boolean;
+  isPreviewing: boolean;
+  previewBlob: Blob | null;
+  analysisResult: SpectralAnalysisResult | null;
+  onOpen: () => void;
   onPresetChange: (preset: EqualizerPreset) => void;
-  onAnalyzeSpectrum: () => void;
-  onApplyEqualizer: () => void;
-  onPreviewEqualizer: (preset: EqualizerPreset) => void;
+  onAnalyze: () => void;
+  onApply: () => void;
+  onPreview: (preset: EqualizerPreset) => void;
+}
+
+/**
+ * Props pour l'édition
+ */
+export interface EditingProps {
+  isEditing: boolean;
+  editingValue: string;
+  onStart: () => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+  onValueChange: (value: string) => void;
+}
+
+/**
+ * Props pour les actions de base
+ */
+export interface BaseActionsProps {
+  onToggleFavorite: () => void;
+  onToggleProtection: () => void;
+  onDownload: (format?: string) => void;
+  onShare: () => void;
+  onDelete: () => void;
+}
+
+interface RingtoneCardProps {
+  ringtone: Ringtone;
+  viewMode: 'block' | 'landscape';
+  isFavorite: boolean;
+  editing: EditingProps;
+  trim: TrimProps;
+  smartRingtone: SmartRingtoneProps;
+  equalizer: EqualizerProps;
+  actions: BaseActionsProps;
 }
 
 export const RingtoneCard = ({
   ringtone,
   viewMode,
   isFavorite,
-  isEditing,
-  editingValue,
-  isTrimOpen,
-  trimStart,
-  trimEnd,
-  isOptimizing,
-  isSmartAnalyzing,
-  segments,
-  selectedSegmentIds,
-  silenceThresholdDb,
-  minSilenceDurationMs,
-  smartSourceBlob,
-  isPreparingSegment,
-  smartPreviewAudioRef,
-  isEqualizerOpen,
-  selectedPreset,
-  isAnalyzingSpectrum,
-  isEqualizing,
-  isPreviewingEqualizer,
-  equalizerPreviewBlob,
-  analysisResult,
-  onToggleFavorite,
-  onToggleProtection,
-  onStartRename,
-  onCancelRename,
-  onConfirmRename,
-  onEditingValueChange,
-  onDownload,
-  onToggleTrim,
-  onTrimStartChange,
-  onTrimEndChange,
-  onOptimizeWithTrim,
-  onShare,
-  onDelete,
-  onAnalyzeSmart,
-  onSilenceThresholdChange,
-  onMinSilenceDurationChange,
-  onToggleSegmentSelection,
-  onPlaySegment,
-  onCreateSegmentVersions,
-  onOpenEqualizer,
-  onPresetChange,
-  onAnalyzeSpectrum,
-  onApplyEqualizer,
-  onPreviewEqualizer,
+  editing,
+  trim,
+  smartRingtone: smartRingtoneProps,
+  equalizer: equalizerProps,
+  actions,
 }: RingtoneCardProps) => {
   return (
     <Card
@@ -134,14 +124,14 @@ export const RingtoneCard = ({
                 title={ringtone.title}
                 isFavorite={isFavorite}
                 isProtected={ringtone.isProtected}
-                isEditing={isEditing}
-                editingValue={editingValue}
-                onToggleFavorite={onToggleFavorite}
-                onToggleProtection={onToggleProtection}
-                onStartRename={onStartRename}
-                onCancelRename={onCancelRename}
-                onConfirmRename={onConfirmRename}
-                onEditingValueChange={onEditingValueChange}
+                isEditing={editing.isEditing}
+                editingValue={editing.editingValue}
+                onToggleFavorite={actions.onToggleFavorite}
+                onToggleProtection={actions.onToggleProtection}
+                onStartRename={editing.onStart}
+                onCancelRename={editing.onCancel}
+                onConfirmRename={editing.onConfirm}
+                onEditingValueChange={editing.onValueChange}
                 viewMode="landscape"
               />
             </div>
@@ -149,55 +139,55 @@ export const RingtoneCard = ({
             <div className="mt-4 flex flex-col gap-2">
               <RingtoneActions
                 ringtone={ringtone}
-                onDownload={onDownload}
-                onToggleTrim={onToggleTrim}
-                onShare={onShare}
-                onDelete={onDelete}
+                onDownload={actions.onDownload}
+                onToggleTrim={trim.onToggle}
+                onShare={actions.onShare}
+                onDelete={actions.onDelete}
               />
 
-              {isTrimOpen && ringtone.duration > 1 && (
+              {trim.isOpen && ringtone.duration > 1 && (
                 <div className="space-y-3">
                   <TrimControls
                     ringtone={ringtone}
-                    trimStart={trimStart}
-                    trimEnd={trimEnd}
-                    onTrimStartChange={onTrimStartChange}
-                    onTrimEndChange={onTrimEndChange}
-                    onOptimize={onOptimizeWithTrim}
-                    isOptimizing={isOptimizing}
+                    trimStart={trim.trimStart}
+                    trimEnd={trim.trimEnd}
+                    onTrimStartChange={trim.onTrimStartChange}
+                    onTrimEndChange={trim.onTrimEndChange}
+                    onOptimize={trim.onOptimize}
+                    isOptimizing={trim.isOptimizing}
                   />
 
                   <ExistingSmartAssistant
                     ringtone={ringtone}
-                    isAnalyzing={isSmartAnalyzing}
-                    segments={segments}
-                    selectedSegmentIds={selectedSegmentIds}
-                    silenceThresholdDb={silenceThresholdDb}
-                    minSilenceDurationMs={minSilenceDurationMs}
-                    smartSourceBlob={smartSourceBlob}
-                    isPreparingSegment={isPreparingSegment}
-                    audioRef={smartPreviewAudioRef}
-                    onAnalyze={onAnalyzeSmart}
-                    onSilenceThresholdChange={onSilenceThresholdChange}
-                    onMinSilenceDurationChange={onMinSilenceDurationChange}
-                    onToggleSegmentSelection={onToggleSegmentSelection}
-                    onPlaySegment={onPlaySegment}
-                    onCreateSegmentVersions={onCreateSegmentVersions}
+                    isAnalyzing={smartRingtoneProps.isAnalyzing}
+                    segments={smartRingtoneProps.segments}
+                    selectedSegmentIds={smartRingtoneProps.selectedSegmentIds}
+                    silenceThresholdDb={smartRingtoneProps.silenceThresholdDb}
+                    minSilenceDurationMs={smartRingtoneProps.minSilenceDurationMs}
+                    smartSourceBlob={smartRingtoneProps.smartSourceBlob}
+                    isPreparingSegment={smartRingtoneProps.isPreparingSegment}
+                    audioRef={smartRingtoneProps.smartPreviewAudioRef}
+                    onAnalyze={smartRingtoneProps.onAnalyze}
+                    onSilenceThresholdChange={smartRingtoneProps.onSilenceThresholdChange}
+                    onMinSilenceDurationChange={smartRingtoneProps.onMinSilenceDurationChange}
+                    onToggleSegmentSelection={smartRingtoneProps.onToggleSegmentSelection}
+                    onPlaySegment={smartRingtoneProps.onPlaySegment}
+                    onCreateSegmentVersions={smartRingtoneProps.onCreateSegmentVersions}
                   />
 
                   <EqualizerSection
-                    isOpen={isEqualizerOpen}
-                    selectedPreset={selectedPreset}
-                    isAnalyzing={isAnalyzingSpectrum}
-                    isProcessing={isEqualizing}
-                    isPreviewing={isPreviewingEqualizer}
-                    previewBlob={equalizerPreviewBlob}
-                    analysisResult={analysisResult}
-                    onOpen={onOpenEqualizer}
-                    onPresetChange={onPresetChange}
-                    onAnalyze={onAnalyzeSpectrum}
-                    onApply={onApplyEqualizer}
-                    onPreview={onPreviewEqualizer}
+                    isOpen={equalizerProps.isOpen}
+                    selectedPreset={equalizerProps.selectedPreset}
+                    isAnalyzing={equalizerProps.isAnalyzing}
+                    isProcessing={equalizerProps.isProcessing}
+                    isPreviewing={equalizerProps.isPreviewing}
+                    previewBlob={equalizerProps.previewBlob}
+                    analysisResult={equalizerProps.analysisResult}
+                    onOpen={equalizerProps.onOpen}
+                    onPresetChange={equalizerProps.onPresetChange}
+                    onAnalyze={equalizerProps.onAnalyze}
+                    onApply={equalizerProps.onApply}
+                    onPreview={equalizerProps.onPreview}
                   />
                 </div>
               )}
@@ -212,20 +202,20 @@ export const RingtoneCard = ({
               title={ringtone.title}
               isFavorite={isFavorite}
               isProtected={ringtone.isProtected}
-              isEditing={isEditing}
-              editingValue={editingValue}
-              onToggleFavorite={onToggleFavorite}
-              onToggleProtection={onToggleProtection}
-              onStartRename={onStartRename}
-              onCancelRename={onCancelRename}
-              onConfirmRename={onConfirmRename}
-              onEditingValueChange={onEditingValueChange}
+              isEditing={editing.isEditing}
+              editingValue={editing.editingValue}
+              onToggleFavorite={actions.onToggleFavorite}
+              onToggleProtection={actions.onToggleProtection}
+              onStartRename={editing.onStart}
+              onCancelRename={editing.onCancel}
+              onConfirmRename={editing.onConfirm}
+              onEditingValueChange={editing.onValueChange}
               viewMode="block"
             />
-            {!isEditing && (
+            {!editing.isEditing && (
               <button
                 type="button"
-                onClick={onStartRename}
+                onClick={editing.onStart}
                 className="text-[11px] px-2 py-1 rounded-full border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 min-h-[28px] flex-shrink-0"
               >
                 Renommer
@@ -242,55 +232,55 @@ export const RingtoneCard = ({
           <div className="mt-4 flex flex-col gap-2">
             <RingtoneActions
               ringtone={ringtone}
-              onDownload={onDownload}
-              onToggleTrim={onToggleTrim}
-              onShare={onShare}
-              onDelete={onDelete}
+              onDownload={actions.onDownload}
+              onToggleTrim={trim.onToggle}
+              onShare={actions.onShare}
+              onDelete={actions.onDelete}
             />
 
-            {isTrimOpen && ringtone.duration > 1 && (
+            {trim.isOpen && ringtone.duration > 1 && (
               <div className="space-y-3 border border-gray-200 dark:border-gray-700 rounded-lg p-3 bg-white/60 dark:bg-gray-800/60">
                 <TrimControls
                   ringtone={ringtone}
-                  trimStart={trimStart}
-                  trimEnd={trimEnd}
-                  onTrimStartChange={onTrimStartChange}
-                  onTrimEndChange={onTrimEndChange}
-                  onOptimize={onOptimizeWithTrim}
-                  isOptimizing={isOptimizing}
+                  trimStart={trim.trimStart}
+                  trimEnd={trim.trimEnd}
+                  onTrimStartChange={trim.onTrimStartChange}
+                  onTrimEndChange={trim.onTrimEndChange}
+                  onOptimize={trim.onOptimize}
+                  isOptimizing={trim.isOptimizing}
                 />
 
                 <ExistingSmartAssistant
                   ringtone={ringtone}
-                  isAnalyzing={isSmartAnalyzing}
-                  segments={segments}
-                  selectedSegmentIds={selectedSegmentIds}
-                  silenceThresholdDb={silenceThresholdDb}
-                  minSilenceDurationMs={minSilenceDurationMs}
-                  smartSourceBlob={smartSourceBlob}
-                  isPreparingSegment={isPreparingSegment}
-                  audioRef={smartPreviewAudioRef}
-                  onAnalyze={onAnalyzeSmart}
-                  onSilenceThresholdChange={onSilenceThresholdChange}
-                  onMinSilenceDurationChange={onMinSilenceDurationChange}
-                  onToggleSegmentSelection={onToggleSegmentSelection}
-                  onPlaySegment={onPlaySegment}
-                  onCreateSegmentVersions={onCreateSegmentVersions}
+                  isAnalyzing={smartRingtoneProps.isAnalyzing}
+                  segments={smartRingtoneProps.segments}
+                  selectedSegmentIds={smartRingtoneProps.selectedSegmentIds}
+                  silenceThresholdDb={smartRingtoneProps.silenceThresholdDb}
+                  minSilenceDurationMs={smartRingtoneProps.minSilenceDurationMs}
+                  smartSourceBlob={smartRingtoneProps.smartSourceBlob}
+                  isPreparingSegment={smartRingtoneProps.isPreparingSegment}
+                  audioRef={smartRingtoneProps.smartPreviewAudioRef}
+                  onAnalyze={smartRingtoneProps.onAnalyze}
+                  onSilenceThresholdChange={smartRingtoneProps.onSilenceThresholdChange}
+                  onMinSilenceDurationChange={smartRingtoneProps.onMinSilenceDurationChange}
+                  onToggleSegmentSelection={smartRingtoneProps.onToggleSegmentSelection}
+                  onPlaySegment={smartRingtoneProps.onPlaySegment}
+                  onCreateSegmentVersions={smartRingtoneProps.onCreateSegmentVersions}
                 />
 
                 <EqualizerSection
-                  isOpen={isEqualizerOpen}
-                  selectedPreset={selectedPreset}
-                  isAnalyzing={isAnalyzingSpectrum}
-                  isProcessing={isEqualizing}
-                  isPreviewing={isPreviewingEqualizer}
-                  previewBlob={equalizerPreviewBlob}
-                  analysisResult={analysisResult}
-                  onOpen={onOpenEqualizer}
-                  onPresetChange={onPresetChange}
-                  onAnalyze={onAnalyzeSpectrum}
-                  onApply={onApplyEqualizer}
-                  onPreview={onPreviewEqualizer}
+                  isOpen={equalizerProps.isOpen}
+                  selectedPreset={equalizerProps.selectedPreset}
+                  isAnalyzing={equalizerProps.isAnalyzing}
+                  isProcessing={equalizerProps.isProcessing}
+                  isPreviewing={equalizerProps.isPreviewing}
+                  previewBlob={equalizerProps.previewBlob}
+                  analysisResult={equalizerProps.analysisResult}
+                  onOpen={equalizerProps.onOpen}
+                  onPresetChange={equalizerProps.onPresetChange}
+                  onAnalyze={equalizerProps.onAnalyze}
+                  onApply={equalizerProps.onApply}
+                  onPreview={equalizerProps.onPreview}
                 />
               </div>
             )}

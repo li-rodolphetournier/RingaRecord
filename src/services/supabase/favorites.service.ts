@@ -83,12 +83,17 @@ export const supabaseFavoritesService = {
     }
 
     // Vérifier si un dossier avec ce nom existe déjà
-    const { data: existing } = await supabase
+    const { data: existing, error: checkError } = await supabase
       .from('favorite_folders')
       .select('id')
       .eq('user_id', user.id)
       .eq('name', dto.name.trim())
-      .single();
+      .maybeSingle();
+
+    // Si erreur autre que "aucun résultat trouvé" (PGRST116), on la propage
+    if (checkError && checkError.code !== 'PGRST116') {
+      throw new Error(`Failed to check existing folder: ${checkError.message}`);
+    }
 
     if (existing) {
       throw new Error('Un dossier avec ce nom existe déjà');
@@ -241,12 +246,17 @@ export const supabaseFavoritesService = {
     }
 
     // Vérifier si le favori existe déjà
-    const { data: existing } = await supabase
+    const { data: existing, error: checkError } = await supabase
       .from('favorites')
       .select('*')
       .eq('user_id', user.id)
       .eq('ringtone_id', dto.ringtoneId)
-      .single();
+      .maybeSingle();
+
+    // Si erreur autre que "aucun résultat trouvé" (PGRST116), on la propage
+    if (checkError && checkError.code !== 'PGRST116') {
+      throw new Error(`Failed to check existing favorite: ${checkError.message}`);
+    }
 
     if (existing) {
       // Mettre à jour le favori existant

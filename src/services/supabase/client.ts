@@ -12,6 +12,8 @@ export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKe
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
+    // Utiliser le storage local pour la session (plus rapide)
+    storage: window.localStorage,
   },
 });
 

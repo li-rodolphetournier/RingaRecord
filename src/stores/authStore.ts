@@ -23,9 +23,9 @@ export const useAuthStore = create<AuthState>()(
       login: async (credentials: LoginCredentials) => {
         set({ isLoading: true, error: null });
         try {
-          await supabaseAuthService.login(credentials);
-          const session = await supabaseAuthService.getSession();
-          set({ isAuthenticated: !!session, isLoading: false });
+          // signInWithPassword retourne déjà la session, pas besoin d'appel supplémentaire
+          const response = await supabaseAuthService.login(credentials);
+          set({ isAuthenticated: !!response.session, isLoading: false });
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Erreur de connexion';
           set({ error: message, isLoading: false, isAuthenticated: false });
@@ -48,9 +48,8 @@ export const useAuthStore = create<AuthState>()(
             return; // Ne pas naviguer vers le dashboard
           }
           
-          // Si on a un token, l'utilisateur est connecté
-          const session = await supabaseAuthService.getSession();
-          set({ isAuthenticated: !!session, isLoading: false });
+          // Si on a un token, l'utilisateur est connecté (la session est déjà dans response)
+          set({ isAuthenticated: !!response.session, isLoading: false });
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Erreur lors de l\'inscription';
           set({ error: message, isLoading: false, isAuthenticated: false });

@@ -1,23 +1,14 @@
-import { useEffect, useState, useCallback, useTransition } from 'react';
-import { toast } from 'react-toastify';
 import type { Ringtone } from '../types/ringtone.types';
 import { Button } from './ui/Button';
 import { Card } from './ui/Card';
 import { AudioPlayer } from './AudioPlayer';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { optimizeRingtone } from '../services/audio/smartRingtone.service';
-import { useSmartRingtone } from '../hooks/useSmartRingtone';
-import { useSegmentPreview } from '../hooks/useSegmentPreview';
-import { useEqualizer } from '../hooks/useEqualizer';
-import { buildRingtonesForSegments } from '../services/audio/ringtoneSegments.service';
 import { Equalizer } from './audio/Equalizer';
 import { getRecommendedRingtoneFormat, getAvailableRingtoneFormats, getFormatLabel } from '../utils/ringtoneFormat';
 import { ShareModal } from './ShareModal';
-import { useRingtoneActions } from '../hooks/useRingtoneActions';
 import { formatDuration, formatSize } from '../utils/formatUtils';
-import { useRingtoneStore } from '../stores/ringtoneStore';
-import { useFavoritesStore } from '../stores/favoritesStore';
+import { useRingtoneDetailsModal } from '../hooks/useRingtoneDetailsModal';
 
 interface RingtoneDetailsModalProps {
   ringtone: Ringtone | null;
@@ -26,23 +17,64 @@ interface RingtoneDetailsModalProps {
 }
 
 export const RingtoneDetailsModal = ({ ringtone, isOpen, onClose }: RingtoneDetailsModalProps) => {
-  const { upload, fetchAll } = useRingtoneStore();
-  const { isFavorite, toggleFavorite } = useFavoritesStore();
-  const { handleRename, handleDownload, handleToggleProtection } = useRingtoneActions();
-  const [, startTransition] = useTransition();
+  const {
+    // États
+    optimizingId,
+    trimRingtoneId,
+    trimStart,
+    trimEnd,
+    downloadMenuId,
+    editingTitleId,
+    editingTitleValue,
+    shareModalOpen,
+    smartSourceBlob,
+    smartSourceRingtoneId,
+    equalizerRingtoneId,
 
-  const [optimizingId, setOptimizingId] = useState<string | null>(null);
-  const [trimRingtoneId, setTrimRingtoneId] = useState<string | null>(null);
-  const [trimStart, setTrimStart] = useState<number>(0);
-  const [trimEnd, setTrimEnd] = useState<number>(0);
-  const [downloadMenuId, setDownloadMenuId] = useState<string | null>(null);
-  const [smartSourceBlob, setSmartSourceBlob] = useState<Blob | null>(null);
-  const [smartSourceRingtoneId, setSmartSourceRingtoneId] = useState<string | null>(null);
-  const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
-  const [editingTitleValue, setEditingTitleValue] = useState<string>('');
-  const [shareModalOpen, setShareModalOpen] = useState(false);
-  const [equalizerRingtoneId, setEqualizerRingtoneId] = useState<string | null>(null);
-  const [equalizerSourceBlob, setEqualizerSourceBlob] = useState<Blob | null>(null);
+    // Setters
+    setTrimStart,
+    setTrimEnd,
+    setDownloadMenuId,
+    setEditingTitleValue,
+    setEqualizerRingtoneId,
+
+    // Favoris
+    isFavorite,
+    toggleFavorite,
+
+    // Actions
+    handleDownload,
+    handleToggleProtection,
+
+    // Édition
+    handleStartRename,
+    handleCancelRename,
+    handleConfirmRename,
+
+    // Trim
+    handleToggleTrim,
+    handleOptimizeExisting,
+
+    // Smart Ringtone
+    smartRingtone,
+    segmentPreview,
+    handleAnalyzeExistingSmart,
+    handleCreateSegmentVersions,
+
+    // Égaliseur
+    equalizer,
+    handleAnalyzeSpectrumForEqualizer,
+    handleApplyEqualizerToExisting,
+    handlePreviewEqualizerForExisting,
+
+    // Partage
+    handleShare,
+    handleCloseShareModal,
+  } = useRingtoneDetailsModal(ringtone);
+
+  if (!isOpen || !ringtone) {
+    return null;
+  }
 
   const {
     isOptimizing: isSmartOptimizing,
@@ -53,20 +85,13 @@ export const RingtoneDetailsModal = ({ ringtone, isOpen, onClose }: RingtoneDeta
     setSilenceThresholdDb,
     setMinSilenceDurationMs,
     toggleSegmentSelection,
-    reset,
-    optimize: optimizeSmart,
-  } = useSmartRingtone();
+  } = smartRingtone;
 
   const {
     audioRef: smartPreviewRef,
     playSegment: playSmartSegment,
     isPreparing: isPreparingSmartSegment,
-  } = useSegmentPreview({
-    segments,
-    onError: (message) => {
-      toast.error(message);
-    },
-  });
+  } = segmentPreview;
 
   const {
     isProcessing: isEqualizing,
@@ -75,286 +100,8 @@ export const RingtoneDetailsModal = ({ ringtone, isOpen, onClose }: RingtoneDeta
     previewBlob: equalizerPreviewBlob,
     selectedPreset,
     analysisResult,
-    error: equalizerError,
-    analyzeAndSuggest,
-    previewPreset,
     setPreset,
-    reset: resetEqualizer,
-  } = useEqualizer();
-
-  useEffect(() => {
-    if (equalizerError) {
-      toast.error(equalizerError);
-    }
-  }, [equalizerError]);
-
-  useEffect(() => {
-    if (ringtone) {
-      setTrimStart(0);
-      setTrimEnd(ringtone.duration);
-    }
-  }, [ringtone]);
-
-  useEffect(() => {
-    if (trimRingtoneId !== ringtone?.id) {
-      reset();
-      setSmartSourceBlob(null);
-      setSmartSourceRingtoneId(null);
-    }
-  }, [trimRingtoneId, ringtone?.id, reset]);
-
-  useEffect(() => {
-    resetEqualizer();
-    setEqualizerSourceBlob(null);
-  }, [equalizerRingtoneId, resetEqualizer]);
-
-  const handleStartRename = useCallback((rt: Ringtone) => {
-    setEditingTitleId(rt.id);
-    setEditingTitleValue(rt.title);
-  }, []);
-
-  const handleCancelRename = useCallback(() => {
-    setEditingTitleId(null);
-    setEditingTitleValue('');
-  }, []);
-
-  const handleConfirmRename = useCallback(
-    async (rt: Ringtone) => {
-      const success = await handleRename(rt, editingTitleValue);
-      if (success) {
-        setEditingTitleId(null);
-        await fetchAll();
-      }
-    },
-    [handleRename, editingTitleValue, fetchAll],
-  );
-
-  const handleOptimizeExisting = useCallback(
-    async (rt: Ringtone) => {
-      try {
-        startTransition(() => {
-          setOptimizingId(rt.id);
-        });
-
-        const response = await fetch(rt.fileUrl);
-        if (!response.ok) {
-          throw new Error('Erreur lors du téléchargement de la sonnerie à optimiser');
-        }
-
-        const originalBlob = await response.blob();
-
-        const hasManualTrim = trimRingtoneId === rt.id && rt.duration > 1;
-        const options = hasManualTrim
-          ? {
-              manualStartSeconds: Math.max(0, Math.min(trimStart, rt.duration - 1)),
-              manualEndSeconds: Math.max(
-                Math.max(0, Math.min(trimStart + 1, rt.duration)),
-                Math.min(trimEnd || rt.duration, rt.duration),
-              ),
-            }
-          : undefined;
-
-        const { optimizedBlob, durationSeconds } = await optimizeRingtone(originalBlob, options);
-
-        const extension = rt.format;
-        const safeMimeType = optimizedBlob.type || 'audio/wav';
-        const baseTitle = `${rt.title} (opt)`;
-        const sanitizedTitle = baseTitle.trim().replace(/[^a-zA-Z0-9_-]+/g, '_') || 'ringtone_opt';
-        const filename = `${sanitizedTitle}.${extension}`;
-        const file = new File([optimizedBlob], filename, { type: safeMimeType });
-
-        const rawDuration = Number.isFinite(durationSeconds)
-          ? durationSeconds
-          : rt.duration;
-        const clampedDuration = Math.max(1, Math.min(40, Math.round(rawDuration)));
-
-        await upload(file, baseTitle, extension, clampedDuration);
-        toast.success(`Version optimisée créée : ${baseTitle}`);
-        await fetchAll();
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Impossible de créer la version optimisée';
-        toast.error(message);
-        console.error('Erreur lors de la création de la version optimisée:', error);
-      } finally {
-        startTransition(() => {
-          setOptimizingId(null);
-        });
-      }
-    },
-    [trimRingtoneId, trimStart, trimEnd, upload, fetchAll],
-  );
-
-  const handleAnalyzeExistingSmart = useCallback(
-    async (rt: Ringtone) => {
-      try {
-        setSmartSourceRingtoneId(rt.id);
-
-        const response = await fetch(rt.fileUrl);
-        if (!response.ok) {
-          throw new Error('Erreur lors du téléchargement de la sonnerie à analyser');
-        }
-
-        const originalBlob = await response.blob();
-        setSmartSourceBlob(originalBlob);
-
-        await optimizeSmart(originalBlob);
-        toast.success('Analyse des segments terminée ✔️');
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Impossible d\'analyser les segments';
-        toast.error(message);
-        console.error('Erreur lors de l\'analyse des segments existants:', error);
-      }
-    },
-    [optimizeSmart],
-  );
-
-  const handleAnalyzeSpectrumForEqualizer = useCallback(
-    async (rt: Ringtone) => {
-      try {
-        setEqualizerRingtoneId(rt.id);
-
-        const response = await fetch(rt.fileUrl);
-        if (!response.ok) {
-          throw new Error('Erreur lors du téléchargement de la sonnerie à analyser');
-        }
-
-        const originalBlob = await response.blob();
-        setEqualizerSourceBlob(originalBlob);
-
-        await analyzeAndSuggest(originalBlob);
-        toast.success('Analyse spectrale terminée ✔️');
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Impossible d'analyser le spectre";
-        toast.error(message);
-        console.error('Erreur lors de l\'analyse spectrale:', error);
-      }
-    },
-    [analyzeAndSuggest],
-  );
-
-  const handlePreviewEqualizerForExisting = useCallback(
-    async (rt: Ringtone, preset: typeof selectedPreset) => {
-      if (!equalizerSourceBlob || equalizerRingtoneId !== rt.id) {
-        toast.error('Analyse spectrale requise avant la prévisualisation');
-        return;
-      }
-
-      try {
-        await previewPreset(equalizerSourceBlob, preset);
-      } catch {
-        // L'erreur est déjà gérée dans le hook
-      }
-    },
-    [equalizerSourceBlob, equalizerRingtoneId, previewPreset],
-  );
-
-  const handleApplyEqualizerToExisting = useCallback(
-    async (rt: Ringtone) => {
-      if (!equalizerSourceBlob || equalizerRingtoneId !== rt.id) {
-        toast.error('Analyse spectrale requise avant l\'application de l\'égaliseur');
-        return;
-      }
-
-      try {
-        const { applyEqualizerPresetToBlob } = await import('../services/audio/equalizer.service');
-        const result = await applyEqualizerPresetToBlob(equalizerSourceBlob, selectedPreset);
-
-        const extension = rt.format;
-        const safeMimeType = result.equalizedBlob.type || 'audio/wav';
-        const baseTitle = `${rt.title} (égalisé)`;
-        const sanitizedTitle = baseTitle.trim().replace(/[^a-zA-Z0-9_-]+/g, '_') || 'ringtone_eq';
-        const filename = `${sanitizedTitle}.${extension}`;
-        const file = new File([result.equalizedBlob], filename, { type: safeMimeType });
-
-        const rawDuration = result.durationSeconds !== null && Number.isFinite(result.durationSeconds)
-          ? result.durationSeconds
-          : rt.duration;
-        const clampedDuration = Math.max(1, Math.min(40, Math.round(rawDuration)));
-
-        await upload(file, baseTitle, extension, clampedDuration);
-        toast.success(`Version égalisée créée : ${baseTitle}`);
-        await fetchAll();
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Impossible de créer la version égalisée';
-        toast.error(message);
-        console.error('Erreur lors de la création de la version égalisée:', error);
-      }
-    },
-    [equalizerSourceBlob, equalizerRingtoneId, selectedPreset, upload, fetchAll],
-  );
-
-  const handleCreateSegmentVersions = useCallback(
-    async (rt: Ringtone) => {
-      if (!smartSourceBlob || smartSourceRingtoneId !== rt.id) {
-        toast.error('Analyse des segments requise avant la création par parties');
-        return;
-      }
-
-      if (segments.length === 0 || selectedSegmentIds.length === 0) {
-        toast.error('Sélectionnez au moins une partie à garder');
-        return;
-      }
-
-      try {
-        const extension = rt.format;
-        const safeMimeType = 'audio/wav';
-        const baseTitle = `${rt.title}`;
-        const sanitizedTitle =
-          baseTitle.trim().replace(/[^a-zA-Z0-9_-]+/g, '_') || 'ringtone_part';
-
-        const selectedSegments = segments.filter((segment) =>
-          selectedSegmentIds.includes(segment.id),
-        );
-
-        const builtRingtones = await buildRingtonesForSegments(smartSourceBlob, selectedSegments);
-
-        for (const built of builtRingtones) {
-          let finalDuration = built.durationSeconds;
-
-          if (!Number.isFinite(finalDuration) || finalDuration < 1) {
-            continue;
-          }
-
-          if (finalDuration > 40) {
-            finalDuration = 40;
-          }
-
-          finalDuration = Math.round(finalDuration);
-
-          const partTitle = `${rt.title} (partie ${built.segmentId})`;
-          const filename = `${sanitizedTitle}_partie_${built.segmentId}.${extension}`;
-          const file = new File([built.blob], filename, { type: safeMimeType });
-
-          await upload(file, partTitle, extension, finalDuration);
-        }
-
-        toast.success('Sonneries par partie créées ✔️');
-        await fetchAll();
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Impossible de créer les sonneries par partie';
-        toast.error(message);
-        console.error('Erreur lors de la création par parties:', error);
-      }
-    },
-    [smartSourceBlob, smartSourceRingtoneId, segments, selectedSegmentIds, upload, fetchAll],
-  );
-
-  const handleShare = useCallback(() => {
-    setShareModalOpen(true);
-  }, []);
-
-  const handleCloseShareModal = useCallback(() => {
-    setShareModalOpen(false);
-  }, []);
-
-  if (!isOpen || !ringtone) {
-    return null;
-  }
+  } = equalizer;
 
   return (
     <>
@@ -609,15 +356,7 @@ export const RingtoneDetailsModal = ({ ringtone, isOpen, onClose }: RingtoneDeta
                   </p>
                 </div>
                 <Button
-                  onClick={() => {
-                    if (trimRingtoneId === ringtone.id) {
-                      setTrimRingtoneId(null);
-                    } else {
-                      setTrimRingtoneId(ringtone.id);
-                      setTrimStart(0);
-                      setTrimEnd(ringtone.duration);
-                    }
-                  }}
+                  onClick={() => handleToggleTrim(ringtone)}
                   variant="secondary"
                   className="min-h-[36px] text-[11px] !rounded-xl px-2 py-1.5"
                 >

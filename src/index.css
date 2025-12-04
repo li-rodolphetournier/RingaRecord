@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Déclaration des couches CSS pour organiser les styles et éviter !important */
+/* Utilisation de CSS Cascade Layers selon les meilleures pratiques (voir CSS-Tricks Almanac) */
+/* Ordre : react-toastify (base) puis nos styles personnalisés (custom) */
+/* Cette déclaration garantit que toastify-custom prendra toujours le dessus sur toastify-base */
+@layer toastify-base, toastify-custom;
+
 @layer base {
   :root {
     /* Palette MyBrand.tools - mode clair */
@@ -69,4 +75,58 @@
   background-color: #2563eb;
   box-shadow: 0 0 0 2px white;
   border: none;
+}
+
+/* Styles pour les toasts de confirmation stylés */
+/* Utilisation de CSS Cascade Layers et sélecteurs spécifiques pour surcharger sans !important */
+
+@layer toastify-custom {
+  /* Sélecteur combinant notre classe personnalisée avec la classe de react-toastify pour augmenter la spécificité */
+  .styled-confirm-toast-container.Toastify__toast--info {
+    min-width: 420px;
+    max-width: 500px;
+    width: 420px;
+  }
+
+  .styled-confirm-toast-container.Toastify__toast--info .Toastify__toast-body {
+    min-width: 420px;
+    max-width: 500px;
+    width: 100%;
+    padding: 1rem;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .styled-confirm-toast-container .styled-confirm-toast {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .styled-confirm-toast-container .styled-confirm-toast > div {
+    width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+  }
+
+  .styled-confirm-toast-container .styled-confirm-toast button {
+    min-width: 0;
+    flex: 1 1 0;
+  }
+
+  @media (max-width: 480px) {
+    .styled-confirm-toast-container.Toastify__toast--info {
+      min-width: calc(100vw - 2rem);
+      max-width: calc(100vw - 2rem);
+      width: calc(100vw - 2rem);
+    }
+    
+    .styled-confirm-toast-container.Toastify__toast--info .Toastify__toast-body {
+      min-width: 100%;
+      max-width: 100%;
+      width: 100%;
+    }
+  }
 }

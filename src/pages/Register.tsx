@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
 import { useAuthStore } from '../stores/authStore';
 import { supabaseAuthService } from '../services/supabase/auth.service';
+import { useErrorHandler } from '../hooks/useErrorHandler';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
@@ -11,22 +11,23 @@ import { Card } from '../components/ui/Card';
 export const Register = () => {
   const navigate = useNavigate();
   const { register, isLoading, error, clearError } = useAuthStore();
+  const { showError, showSuccess } = useErrorHandler();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
     if (error) {
-      toast.error(error);
+      showError(error);
     }
-  }, [error]);
+  }, [error, showError]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     clearError();
 
     if (password !== confirmPassword) {
-      toast.error('Les mots de passe ne correspondent pas');
+      showError('Les mots de passe ne correspondent pas');
       return;
     }
 
@@ -35,7 +36,7 @@ export const Register = () => {
       // Ne naviguer que si l'utilisateur est authentifié (pas de confirmation email requise)
       const session = await supabaseAuthService.getSession();
       if (session) {
-        toast.success('Inscription réussie !');
+        showSuccess('Inscription réussie !');
         setTimeout(() => navigate('/dashboard'), 800);
       }
       // Sinon, le message d'erreur du store indiquera qu'il faut confirmer l'email
