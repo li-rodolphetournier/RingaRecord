@@ -9,7 +9,7 @@ interface RingtoneMetaProps {
 
 export const RingtoneMeta = ({ ringtone }: RingtoneMetaProps) => {
   return (
-    <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-gray-600 dark:text-gray-400">
       <p>Format: {ringtone.format.toUpperCase()}</p>
       <p>Durée: {formatDuration(ringtone.duration)}</p>
       <p>Taille: {formatSize(ringtone.sizeBytes)}</p>

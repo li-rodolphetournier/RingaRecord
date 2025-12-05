@@ -9,6 +9,7 @@ import { BPMSection } from '../components/record/BPMSection';
 import { SaveSection } from '../components/record/SaveSection';
 import { Equalizer } from '../components/audio/Equalizer';
 import { useRecordPage } from '../hooks/useRecordPage';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 /**
  * Page d'enregistrement de sonneries
@@ -91,9 +92,12 @@ export const Record = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 px-4 py-8">
       <div className="max-w-2xl mx-auto">
-        <Button onClick={() => navigate('/dashboard')} variant="secondary" className="mb-6">
-          ← Retour
-        </Button>
+        <div className="flex items-center justify-between mb-6">
+          <Button onClick={() => navigate('/dashboard')} variant="secondary">
+            ← Retour
+          </Button>
+          <ThemeToggle />
+        </div>
 
         <Card>
           <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">

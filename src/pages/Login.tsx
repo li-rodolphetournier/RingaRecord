@@ -6,6 +6,7 @@ import { useErrorHandler } from '../hooks/useErrorHandler';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 export const Login = () => {
   const navigate = useNavigate();
@@ -35,6 +36,9 @@ export const Login = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
       <Card className="w-full max-w-md">
         <h1 className="text-2xl font-bold mb-6 text-center text-gray-900 dark:text-gray-100">
           Connexion

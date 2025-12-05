@@ -48,13 +48,14 @@ npm run dev
 src/
 ├── components/                 # UI + audio player
 │   ├── audio/                  # AudioPlayer, Equalizer
-│   └── ui/                     # Button, Card, Input
-├── hooks/                      # useAudioRecorder, useSmartRingtone, useSegmentPreview, useEqualizer, useBPMDetection
+│   ├── ui/                     # Button, Card, Input, Switch
+│   └── ThemeToggle.tsx         # Composant switch de thème
+├── hooks/                      # useAudioRecorder, useSmartRingtone, useSegmentPreview, useEqualizer, useBPMDetection, useTheme
 ├── services/
 │   ├── audio/                  # smartRingtone, equalizer, bpmDetection, spectralAnalysis, ringtoneSegments
 │   └── supabase/               # client + auth + ringtones services
-├── stores/                     # Zustand stores (auth, ringtones)
-├── pages/                      # Login / Register / Dashboard / Record
+├── stores/                     # Zustand stores (auth, ringtones, theme)
+├── pages/                      # Login / Register / Dashboard / Record / Favorites
 ├── types/                      # Types partagés (ringtone, equalizer, bpm)
 ├── utils/                      # Utilitaires (ringtoneConstants, ringtoneFile.utils)
 └── test/                       # Setup Vitest
@@ -188,6 +189,8 @@ Pour chaque carte de sonnerie :
 - ✅ `bpmDetection.service.test.ts` - Tests de détection BPM
 - ✅ `equalizer.service.test.ts` - Tests de l'égaliseur
 - ✅ `spectralAnalysis.service.test.ts` - Tests d'analyse spectrale
+- ✅ `themeStore.test.ts` - Tests du store de thème (dark mode)
+- ✅ `Switch.test.tsx` - Tests du composant Switch réutilisable
 
 ## 🔐 Sécurité
 
@@ -249,6 +252,16 @@ Pour chaque carte de sonnerie :
   - **Blocage de suppression** : les sonneries protégées ne peuvent pas être supprimées
   - Message d'avertissement si tentative de suppression d'une sonnerie protégée
   - Colonne `is_protected` dans la base de données (migration `003_add_is_protected_column.sql`)
+
+- ✅ **🌙 Dark Mode avec Switch**
+  - **Switch de thème** : Basculer entre mode clair et sombre en un clic
+  - **Persistance** : Le choix du thème est sauvegardé dans localStorage
+  - **Détection système** : Utilise la préférence système au premier chargement
+  - **Disponible partout** : Switch accessible sur toutes les pages (Login, Register, Dashboard, Record, Favorites)
+  - **Transitions fluides** : Changement de thème avec animations CSS
+  - **Accessible** : Support clavier (Enter, Espace) et ARIA labels
+  - **Mobile-friendly** : Taille minimale 44x44px pour le touch
+  - **Configuration Tailwind** : `darkMode: 'class'` pour activation via classe `.dark` sur `<html>`
 
 ### En développement
 

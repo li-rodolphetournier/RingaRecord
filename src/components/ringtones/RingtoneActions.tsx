@@ -18,19 +18,19 @@ export const RingtoneActions = ({
   onDelete,
 }: RingtoneActionsProps) => {
   return (
-    <div className="flex flex-col sm:flex-row gap-2 min-w-0">
+    <div className="grid grid-cols-2 gap-2 min-w-0">
       <RingtoneDownloadMenu onDownload={(format) => onDownload(format)} />
       <Button
         onClick={onToggleTrim}
         variant="secondary"
-        className="flex-1 min-h-[36px] text-[11px] !rounded-xl px-2 py-1.5 min-w-0"
+        className="min-h-[36px] text-[11px] !rounded-xl px-2 py-1.5 min-w-0"
       >
         <span className="truncate">✂️ Découper</span>
       </Button>
       <Button
         onClick={onShare}
         variant="secondary"
-        className="flex-1 min-h-[36px] text-[11px] !rounded-xl px-2 py-1.5 min-w-0"
+        className="min-h-[36px] text-[11px] !rounded-xl px-2 py-1.5 min-w-0"
         title="Partager la sonnerie"
       >
         <svg
@@ -52,7 +52,7 @@ export const RingtoneActions = ({
       <Button
         onClick={onDelete}
         variant="danger"
-        className="flex-1 min-h-[36px] text-[11px] !rounded-xl px-2 py-1.5 min-w-0"
+        className="min-h-[36px] text-[11px] !rounded-xl px-2 py-1.5 min-w-0"
         disabled={ringtone.isProtected}
         title={
           ringtone.isProtected

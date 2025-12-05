@@ -7,6 +7,7 @@ import { ShareModal } from '../components/ShareModal';
 import { RingtoneCard } from '../components/ringtones/RingtoneCard';
 import type { RingtoneFormat } from '../services/audio/ringtoneConverter.service';
 import { useDashboard } from '../hooks/useDashboard';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 export const Dashboard = () => {
   const {
@@ -121,7 +122,8 @@ export const Dashboard = () => {
       <header className="bg-white dark:bg-gray-800 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">RingaRecord</h1>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
             <Button onClick={() => navigate('/record')} variant="primary">
               Nouvelle sonnerie
             </Button>

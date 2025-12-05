@@ -5,6 +5,7 @@ import { FavoriteFolderModal } from '../components/favorites/FavoriteFolderModal
 import { FavoritesRootList } from '../components/favorites/FavoritesRootList';
 import { FavoritesFoldersPanel } from '../components/favorites/FavoritesFoldersPanel';
 import { useFavorites } from '../hooks/useFavorites';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 export const Favorites = () => {
   const {
@@ -50,6 +51,7 @@ export const Favorites = () => {
               </p>
             </div>
           </div>
+          <ThemeToggle />
         </div>
       </header>
 

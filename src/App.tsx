@@ -7,6 +7,7 @@ import { supabaseAuthService } from './services/supabase/auth.service';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { useThemeStore } from './stores/themeStore';
 
 const Dashboard = lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.Dashboard })));
 const Record = lazy(() => import('./pages/Record').then((m) => ({ default: m.Record })));
@@ -51,6 +52,10 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 function App() {
+  // Initialiser le thème au chargement de l'application
+  // Le store s'initialise automatiquement et applique le thème
+  useThemeStore();
+
   return (
     <ErrorBoundary>
       <BrowserRouter>
