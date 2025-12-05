@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import type { MouseEvent } from 'react';
 import {
   getFacebookShareUrl,
   getTwitterShareUrl,
