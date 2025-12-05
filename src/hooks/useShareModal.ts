@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
   getFacebookShareUrl,
   getTwitterShareUrl,
@@ -36,11 +36,14 @@ export const useShareModal = ({
 }: UseShareModalProps): UseShareModalReturn => {
   const [copied, setCopied] = useState(false);
 
-  const shareOptions: ShareOptions = {
-    url: shareUrl,
-    title: title || 'Sonnerie RingaRecord',
-    description: description || 'Découvrez cette sonnerie créée avec RingaRecord!',
-  };
+  const shareOptions: ShareOptions = useMemo(
+    () => ({
+      url: shareUrl,
+      title: title || 'Sonnerie RingaRecord',
+      description: description || 'Découvrez cette sonnerie créée avec RingaRecord!',
+    }),
+    [shareUrl, title, description],
+  );
 
   const handleShare = useCallback(
     async (platform: string): Promise<void> => {

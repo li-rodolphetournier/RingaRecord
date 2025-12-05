@@ -1,3 +1,5 @@
+import { MAX_RINGTONE_DURATION_SECONDS } from '../../utils/ringtoneConstants';
+
 export interface SmartRingtoneOptions {
   /** Niveau max cible pour la normalisation (0-1). */
   targetPeak?: number;
@@ -51,7 +53,7 @@ const DEFAULT_OPTIONS: InternalSmartOptions = {
   targetPeak: 0.9,
   fadeInSeconds: 0.15,
   fadeOutSeconds: 0.3,
-  maxDurationSeconds: 40,
+  maxDurationSeconds: MAX_RINGTONE_DURATION_SECONDS,
   silenceThresholdDb: -40,
   minSilenceDurationMs: 200,
 };

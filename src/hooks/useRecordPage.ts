@@ -25,6 +25,7 @@ export const useRecordPage = () => {
   // États locaux
   const [title, setTitle] = useState('');
   const [gain, setGain] = useState(2.0);
+  const [maxDuration, setMaxDuration] = useState<number>(120); // Durée maximum d'enregistrement en secondes
   const [recordingMode, setRecordingMode] = useState<RecordingMode>('microphone');
   const [lastOriginalBlob, setLastOriginalBlob] = useState<Blob | null>(null);
   const [useOptimizedVersion, setUseOptimizedVersion] = useState<boolean>(true);
@@ -33,6 +34,7 @@ export const useRecordPage = () => {
   const [trimEnd, setTrimEnd] = useState<number>(0);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const [activeSegmentId, setActiveSegmentId] = useState<number | null>(null);
+  const [isSegmentPlaying, setIsSegmentPlaying] = useState<boolean>(false);
 
   // Hooks personnalisés
   const bpmDetection = useBPMDetection();
@@ -55,8 +57,11 @@ export const useRecordPage = () => {
   useEffect(() => {
     if (!isRecordingModeSupported(recordingMode)) {
       if (recordingMode === 'system') {
-        setRecordingMode('microphone');
-        showWarning('Le mode son système n\'est pas disponible sur votre navigateur. Mode microphone activé.');
+        // Utiliser setTimeout pour éviter setState dans useEffect
+        setTimeout(() => {
+          setRecordingMode('microphone');
+          showWarning('Le mode son système n\'est pas disponible sur votre navigateur. Mode microphone activé.');
+        }, 0);
       }
     }
   }, [recordingMode, showWarning]);
@@ -64,19 +69,24 @@ export const useRecordPage = () => {
   // Mettre à jour les bornes de découpe quand la durée change
   useEffect(() => {
     if (audioRecorder.duration > 0) {
-      setTrimStart((prev) => Math.max(0, Math.min(prev, audioRecorder.duration - 1)));
-      setTrimEnd((prev) => {
-        if (prev <= 0 || prev > audioRecorder.duration) {
-          return audioRecorder.duration;
-        }
-        if (prev <= trimStart) {
-          return Math.min(audioRecorder.duration, trimStart + 1);
-        }
-        return prev;
-      });
+      // Utiliser setTimeout pour éviter setState dans useEffect
+      setTimeout(() => {
+        setTrimStart((prev) => Math.max(0, Math.min(prev, audioRecorder.duration - 1)));
+        setTrimEnd((prev) => {
+          if (prev <= 0 || prev > audioRecorder.duration) {
+            return audioRecorder.duration;
+          }
+          if (prev <= trimStart) {
+            return Math.min(audioRecorder.duration, trimStart + 1);
+          }
+          return prev;
+        });
+      }, 0);
     } else {
-      setTrimStart(0);
-      setTrimEnd(0);
+      setTimeout(() => {
+        setTrimStart(0);
+        setTrimEnd(0);
+      }, 0);
     }
   }, [audioRecorder.duration, trimStart]);
 
@@ -95,12 +105,32 @@ export const useRecordPage = () => {
     const handleTimeUpdate = () => {
       if (audio.currentTime >= segment.endSeconds) {
         audio.pause();
+        setIsSegmentPlaying(false);
       }
     };
 
+    const handlePlay = () => {
+      setIsSegmentPlaying(true);
+    };
+
+    const handlePause = () => {
+      setIsSegmentPlaying(false);
+    };
+
+    const handleEnded = () => {
+      setIsSegmentPlaying(false);
+    };
+
     audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
+    audio.addEventListener('ended', handleEnded);
+
     return () => {
       audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
+      audio.removeEventListener('ended', handleEnded);
     };
   }, [activeSegmentId, smartRingtone.segments]);
 
@@ -145,11 +175,11 @@ export const useRecordPage = () => {
     } catch (error) {
       handleError(error, 'démarrage enregistrement');
     }
-  }, [audioRecorder.startRecording, recordingMode, showInfo, handleError]);
+  }, [audioRecorder, recordingMode, showInfo, handleError]);
 
   const handleStop = useCallback(() => {
     audioRecorder.stopRecording();
-  }, [audioRecorder.stopRecording]);
+  }, [audioRecorder]);
 
   const handlePlaySegment = useCallback((segmentId: number) => {
     const audio = previewAudioRef.current;
@@ -157,6 +187,13 @@ export const useRecordPage = () => {
 
     if (!audio || !segment) {
       showError('Impossible de lire ce segment audio');
+      return;
+    }
+
+    // Si le même segment est déjà en cours de lecture, mettre en pause
+    if (activeSegmentId === segmentId && isSegmentPlaying) {
+      audio.pause();
+      setIsSegmentPlaying(false);
       return;
     }
 
@@ -172,15 +209,22 @@ export const useRecordPage = () => {
     const safeStart = Math.max(0, Math.min(segment.startSeconds, maxSafeStart));
 
     try {
+      // Si on change de segment, arrêter la lecture en cours
+      if (activeSegmentId !== segmentId) {
+        audio.pause();
+      }
+
       setActiveSegmentId(segmentId);
       audio.currentTime = safeStart;
       void audio.play().catch((error) => {
         handleError(error, 'lecture segment audio');
+        setIsSegmentPlaying(false);
       });
     } catch (error) {
       handleError(error, 'lecture segment audio');
+      setIsSegmentPlaying(false);
     }
-  }, [smartRingtone.segments, showError, showInfo, handleError]);
+  }, [smartRingtone.segments, activeSegmentId, isSegmentPlaying, showError, showInfo, handleError]);
 
   const handleOptimize = useCallback(async () => {
     const originalBlob = audioRecorder.getAudioBlob();
@@ -200,8 +244,11 @@ export const useRecordPage = () => {
                 Math.max(0, Math.min(trimStart + 1, audioRecorder.duration)),
                 Math.min(trimEnd, audioRecorder.duration),
               ),
+              maxDurationSeconds: maxDuration,
             }
-          : undefined;
+          : {
+              maxDurationSeconds: maxDuration,
+            };
 
       await smartRingtone.optimize(originalBlob, options);
       setUseOptimizedVersion(true);
@@ -209,7 +256,7 @@ export const useRecordPage = () => {
     } catch {
       // L'erreur est déjà gérée dans le hook
     }
-  }, [audioRecorder, useManualTrim, trimStart, trimEnd, smartRingtone, equalizer, showError, showSuccess]);
+  }, [audioRecorder, useManualTrim, trimStart, trimEnd, smartRingtone, equalizer, showError, showSuccess, maxDuration]);
 
   const handleAnalyzeSpectrum = useCallback(async () => {
     const baseBlob = lastOriginalBlob ?? audioRecorder.getAudioBlob();
@@ -305,6 +352,37 @@ export const useRecordPage = () => {
     }
   }, [loopSync, showSuccess]);
 
+  const getBlobDuration = useCallback(async (blob: Blob): Promise<number | null> => {
+    try {
+      const arrayBuffer = await blob.arrayBuffer();
+      const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioContextClass) {
+        return null;
+      }
+      const audioContext = new AudioContextClass();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      
+      const rawDuration = audioBuffer.duration;
+      if (!Number.isFinite(rawDuration) || rawDuration <= 0 || rawDuration > 300) {
+        console.warn('Durée audio invalide:', rawDuration);
+        await audioContext.close();
+        return null;
+      }
+      
+      const seconds = Math.round(rawDuration);
+      await audioContext.close();
+      
+      if (seconds < 1 || seconds > maxDuration) {
+        console.warn(`Durée hors plage acceptable pour sonnerie (max: ${maxDuration}s):`, seconds);
+      }
+      
+      return seconds;
+    } catch (durationError) {
+      console.error('Impossible de calculer la durée audio:', durationError);
+      return null;
+    }
+  }, [maxDuration]);
+
   const handleSave = useCallback(async () => {
     if (!title.trim()) {
       showError('Veuillez entrer un titre');
@@ -374,12 +452,12 @@ export const useRecordPage = () => {
       }
 
       const duration = await getBlobDuration(blobToSave);
-      if (!duration || duration < 1 || duration > 40) {
-        showError('La durée doit être entre 1 et 40 secondes pour une sonnerie');
+      if (!duration || duration < 1 || duration > maxDuration) {
+        showError(`La durée doit être entre 1 et ${maxDuration} secondes pour une sonnerie`);
         return;
       }
 
-      const clampedDuration = Math.max(1, Math.min(40, Math.round(duration)));
+      const clampedDuration = Math.max(1, Math.min(maxDuration, Math.round(duration)));
       const { file } = prepareRingtoneFromBlob({
         blob: blobToSave,
         title: title.trim(),
@@ -407,38 +485,9 @@ export const useRecordPage = () => {
     showError,
     showSuccess,
     handleError,
+    maxDuration,
+    getBlobDuration,
   ]);
-
-  const getBlobDuration = async (blob: Blob): Promise<number | null> => {
-    try {
-      const arrayBuffer = await blob.arrayBuffer();
-      const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!AudioContextClass) {
-        return null;
-      }
-      const audioContext = new AudioContextClass();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      
-      const rawDuration = audioBuffer.duration;
-      if (!Number.isFinite(rawDuration) || rawDuration <= 0 || rawDuration > 300) {
-        console.warn('Durée audio invalide:', rawDuration);
-        await audioContext.close();
-        return null;
-      }
-      
-      const seconds = Math.round(rawDuration);
-      await audioContext.close();
-      
-      if (seconds < 1 || seconds > 40) {
-        console.warn('Durée hors plage acceptable pour sonnerie:', seconds);
-      }
-      
-      return seconds;
-    } catch (durationError) {
-      console.error('Impossible de calculer la durée audio:', durationError);
-      return null;
-    }
-  };
 
   return {
     // États
@@ -446,6 +495,8 @@ export const useRecordPage = () => {
     setTitle,
     gain,
     setGain,
+    maxDuration,
+    setMaxDuration,
     recordingMode,
     setRecordingMode,
     useOptimizedVersion,
@@ -458,6 +509,7 @@ export const useRecordPage = () => {
     setTrimEnd,
     lastOriginalBlob,
     activeSegmentId,
+    isSegmentPlaying,
     previewAudioRef,
     browserSupport,
 

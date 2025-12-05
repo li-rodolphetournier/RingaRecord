@@ -10,7 +10,13 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "lint:check": "eslint . --max-warnings 0 || (echo 'Lint failed' && exit 1)",
+    "build:vercel": "npm run lint:check && npm run test:run && npm run build",
+    "deploy:check": "npm run build:vercel",
+    "deploy:check:win": "powershell -ExecutionPolicy Bypass -File ./scripts/vercel-build-check.ps1",
+    "deploy:check:unix": "bash ./scripts/vercel-build-check.sh",
+    "prebuild": "npm run lint"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.86.0",

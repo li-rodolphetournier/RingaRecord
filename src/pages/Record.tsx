@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo } from 'react';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { RecordingControls } from '../components/record/RecordingControls';
@@ -22,6 +23,8 @@ export const Record = () => {
     setTitle,
     gain,
     setGain,
+    maxDuration,
+    setMaxDuration,
     recordingMode,
     setRecordingMode,
     useOptimizedVersion,
@@ -34,6 +37,7 @@ export const Record = () => {
     setTrimEnd,
     lastOriginalBlob,
     activeSegmentId,
+    isSegmentPlaying,
 
     // Hooks
     audioRecorder,
@@ -57,7 +61,32 @@ export const Record = () => {
 
     // Utilitaires
     isUploading,
+    previewAudioRef,
   } = useRecordPage();
+
+  // Créer une URL pour l'élément audio de prévisualisation des segments
+  const previewAudioUrl = useMemo(() => {
+    if (!lastOriginalBlob) {
+      return null;
+    }
+    return URL.createObjectURL(lastOriginalBlob);
+  }, [lastOriginalBlob]);
+
+  // Mettre à jour la source de l'audio quand le blob change
+  useEffect(() => {
+    const audio = previewAudioRef.current;
+    if (audio && previewAudioUrl) {
+      audio.src = previewAudioUrl;
+      audio.load(); // Recharger pour que les métadonnées soient disponibles
+    }
+
+    // Cleanup: révoquer l'URL quand le composant se démonte ou que le blob change
+    return () => {
+      if (previewAudioUrl) {
+        URL.revokeObjectURL(previewAudioUrl);
+      }
+    };
+  }, [previewAudioUrl, previewAudioRef]);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 px-4 py-8">
@@ -79,9 +108,11 @@ export const Record = () => {
               duration={audioRecorder.duration}
               title={title}
               gain={gain}
+              maxDuration={maxDuration}
               recordingMode={recordingMode}
               onTitleChange={setTitle}
               onGainChange={setGain}
+              onMaxDurationChange={setMaxDuration}
               onRecordingModeChange={setRecordingMode}
               onStart={handleStart}
               onStop={handleStop}
@@ -101,6 +132,7 @@ export const Record = () => {
                 minSilenceDurationMs={smartRingtone.minSilenceDurationMs}
                 segments={smartRingtone.segments}
                 activeSegmentId={activeSegmentId}
+                isSegmentPlaying={isSegmentPlaying}
                 onOptimize={handleOptimize}
                 onToggleManualTrim={setUseManualTrim}
                 onTrimStartChange={setTrimStart}
@@ -159,6 +191,20 @@ export const Record = () => {
           </div>
         </Card>
       </div>
+
+      {/* Élément audio caché pour la prévisualisation des segments */}
+      {previewAudioUrl && (
+        <audio
+          ref={previewAudioRef}
+          src={previewAudioUrl}
+          preload="metadata"
+          crossOrigin="anonymous"
+          style={{ display: 'none' }}
+          onError={(e) => {
+            console.warn('Erreur de chargement audio pour segments:', e);
+          }}
+        />
+      )}
     </div>
   );
 };

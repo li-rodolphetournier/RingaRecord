@@ -110,9 +110,12 @@ export const useAudioRecorder = (options: UseAudioRecorderOptions = {}): UseAudi
         // Capture audio système (getDisplayMedia)
         // Note: Certains navigateurs nécessitent video: true même si on veut juste l'audio
         try {
+          // Permettre la sélection d'onglet, fenêtre ou écran entier
+          // Ne pas forcer 'browser' pour permettre la capture de Teams et autres applications
           const displayStream = await navigator.mediaDevices.getDisplayMedia({
             video: {
-              displaySurface: 'browser', // Préférer l'onglet navigateur
+              // Permettre onglet, fenêtre ou écran (pas de contrainte displaySurface)
+              // Cela permet de capturer Teams et autres applications
             } as MediaTrackConstraints,
             audio: {
               echoCancellation: false,
@@ -122,22 +125,118 @@ export const useAudioRecorder = (options: UseAudioRecorderOptions = {}): UseAudi
             } as MediaTrackConstraints,
           });
           
-          // Extraire uniquement les pistes audio
+          // Vérifier si l'utilisateur a bien coché "Partager l'audio" dans le sélecteur
           const audioTracks = displayStream.getAudioTracks();
+          const videoTracks = displayStream.getVideoTracks();
+          
           if (audioTracks.length === 0) {
-            throw new Error('Aucune piste audio disponible dans la capture. Assurez-vous de partager l\'audio.');
+            // Arrêter le stream si pas d'audio
+            displayStream.getTracks().forEach((track) => track.stop());
+            
+            // Détecter si c'est une application externe (fenêtre) vs onglet navigateur
+            const isExternalApp = videoTracks.length > 0 && 
+              videoTracks.some(track => {
+                const settings = track.getSettings();
+                // Si displaySurface est 'window', c'est une application externe
+                return settings.displaySurface === 'window';
+              });
+            
+            let errorMessage = 'Aucune piste audio disponible.\n\n';
+            
+            if (isExternalApp) {
+              // Application externe détectée (Teams desktop, etc.)
+              errorMessage += '🔍 DIAGNOSTIC : Application externe détectée.\n\n';
+              errorMessage += '✅ SOLUTION RECOMMANDÉE :\n';
+              errorMessage += 'Les applications desktop (Teams, Discord, etc.) ne partagent souvent pas l\'audio via le navigateur.\n\n';
+              errorMessage += '1. Ouvrez l\'application dans votre navigateur :\n';
+              errorMessage += '   • Teams → https://teams.microsoft.com\n';
+              errorMessage += '   • Discord → https://discord.com/app\n';
+              errorMessage += '   • Autre → Utilisez la version web de l\'application\n\n';
+              errorMessage += '2. Rejoignez l\'appel/réunion depuis le navigateur\n\n';
+              errorMessage += '3. Dans RingaRecord, sélectionnez "Son système" et choisissez l\'onglet du navigateur\n\n';
+              errorMessage += '4. ⚠️ COCHEZ "Partager l\'audio" dans le sélecteur (peut être en bas)\n\n';
+            } else if (videoTracks.length > 0) {
+              // Onglet navigateur mais pas d'audio
+              errorMessage += '🔍 DIAGNOSTIC : Onglet sélectionné mais audio non partagé.\n\n';
+              errorMessage += '✅ SOLUTIONS :\n\n';
+              errorMessage += '1. ⚠️ IMPORTANT : Dans le sélecteur de partage, vous DEVEZ cocher la case "Partager l\'audio" ou "Share audio"\n';
+              errorMessage += '   → Cette case peut être en BAS du sélecteur (faites défiler si nécessaire)\n';
+              errorMessage += '   → Cochez-la AVANT de cliquer sur "Partager"\n\n';
+              errorMessage += '2. Assurez-vous que l\'onglet diffuse du son :\n';
+              errorMessage += '   → Un appel/réunion doit être en cours\n';
+              errorMessage += '   → Ou une vidéo/musique doit être en lecture\n\n';
+              errorMessage += '3. Si l\'option "Partager l\'audio" n\'apparaît pas :\n';
+              errorMessage += '   → L\'onglet ne supporte peut-être pas le partage audio\n';
+              errorMessage += '   → Essayez un autre onglet (YouTube, Spotify, etc.)\n\n';
+            } else {
+              // Aucune sélection
+              errorMessage += 'Aucune source sélectionnée.\n\n';
+              errorMessage += '💡 Sélectionnez un onglet, une fenêtre ou un écran qui diffuse du son.';
+            }
+            
+            throw new Error(errorMessage);
           }
           
-          // Créer un nouveau stream avec uniquement l'audio
-          originalStream = new MediaStream(audioTracks);
+          // Vérifier que les pistes audio sont actives
+          const activeAudioTracks = audioTracks.filter((track) => track.readyState === 'live');
+          if (activeAudioTracks.length === 0) {
+            displayStream.getTracks().forEach((track) => track.stop());
+            throw new Error(
+              'Les pistes audio ne sont pas actives. ' +
+              'Assurez-vous que Teams diffuse du son et que vous avez coché "Partager l\'audio" dans le sélecteur.'
+            );
+          }
+          
+          // Créer un nouveau stream avec uniquement l'audio actif
+          originalStream = new MediaStream(activeAudioTracks);
           
           // Arrêter les pistes vidéo si présentes (pour économiser les ressources)
           displayStream.getVideoTracks().forEach((track) => {
             track.stop();
           });
+          
+          // Surveiller si la piste audio se coupe (utilisateur arrête le partage)
+          activeAudioTracks.forEach((track) => {
+            track.onended = () => {
+              console.warn('Piste audio système interrompue - l\'utilisateur a peut-être arrêté le partage');
+              if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                mediaRecorderRef.current.stop();
+                setIsRecording(false);
+                setIsPaused(false);
+                stopDurationTimer();
+                setError('Capture audio interrompue. Le partage d\'écran/audio a été arrêté.');
+              }
+            };
+          });
         } catch (displayError) {
           const errorMessage = displayError instanceof Error ? displayError.message : 'Erreur lors de la capture audio système';
-          throw new Error(`Impossible de capturer l'audio système: ${errorMessage}. Essayez de sélectionner un onglet avec du son.`);
+          
+          // Vérifier si le message d'erreur indique une application externe
+          const isExternalAppError = errorMessage.includes('Application externe détectée') || 
+                                     errorMessage.includes('application desktop');
+          
+          if (isExternalAppError) {
+            // Le message d'erreur contient déjà les instructions pour utiliser le navigateur
+            throw new Error(errorMessage);
+          }
+          
+          // Message d'erreur générique avec conseils
+          throw new Error(
+            `Impossible de capturer l'audio système: ${errorMessage}\n\n` +
+            `💡 CONSEILS :\n\n` +
+            `1. Si vous utilisez une APPLICATION DESKTOP (Teams, Discord, etc.) :\n` +
+            `   → Ouvrez l'application dans votre navigateur\n` +
+            `   → Teams : https://teams.microsoft.com\n` +
+            `   → Discord : https://discord.com/app\n` +
+            `   → Rejoignez l'appel depuis le navigateur, puis sélectionnez l'onglet\n\n` +
+            `2. Si l'application est déjà dans le navigateur :\n` +
+            `   → Sélectionnez l'onglet avec l'application\n` +
+            `   → ⚠️ COCHEZ "Partager l'audio" dans le sélecteur (peut être en bas)\n` +
+            `   → Assurez-vous qu'un appel/réunion est en cours ou qu'un son est diffusé\n\n` +
+            `3. Si l'option "Partager l'audio" n'apparaît pas :\n` +
+            `   → Essayez un autre onglet qui diffuse du son (YouTube, Spotify, etc.)\n` +
+            `   → Ou utilisez le mode microphone pour capturer via votre micro`
+          );
         }
       } else {
         // Capture microphone (getUserMedia)

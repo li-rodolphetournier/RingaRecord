@@ -1,5 +1,6 @@
 import { supabase } from './client';
 import type { Ringtone, CreateRingtoneDto, UpdateRingtoneDto } from '../../types/ringtone.types';
+import { MAX_RINGTONE_DURATION_SECONDS, MIN_RINGTONE_DURATION_SECONDS } from '../../utils/ringtoneConstants';
 
 export const supabaseRingtonesService = {
   async getAll(): Promise<Ringtone[]> {
@@ -187,9 +188,10 @@ export const supabaseRingtonesService = {
     }
 
     // Validation de la durée avant l'envoi
-    // Les sonneries doivent avoir une durée entre 1 et 40 secondes (selon contrainte DB)
-    if (!Number.isFinite(duration) || duration < 1 || duration > 40) {
-      throw new Error(`Durée invalide: ${duration}s. La durée doit être entre 1 et 40 secondes.`);
+    if (!Number.isFinite(duration) || duration < MIN_RINGTONE_DURATION_SECONDS || duration > MAX_RINGTONE_DURATION_SECONDS) {
+      throw new Error(
+        `Durée invalide: ${duration}s. La durée doit être entre ${MIN_RINGTONE_DURATION_SECONDS} et ${MAX_RINGTONE_DURATION_SECONDS} secondes.`
+      );
     }
 
     // S'assurer que la durée est un entier

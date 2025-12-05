@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS ringtones (
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   title TEXT NOT NULL,
   format TEXT NOT NULL,
-  duration INTEGER NOT NULL CHECK (duration > 0 AND duration <= 40),
+  duration INTEGER NOT NULL CHECK (duration > 0 AND duration <= 120),
   size_bytes INTEGER NOT NULL CHECK (size_bytes > 0),
   file_url TEXT NOT NULL,
   waveform JSONB,

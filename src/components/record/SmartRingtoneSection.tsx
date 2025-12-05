@@ -12,6 +12,7 @@ interface SmartRingtoneSectionProps {
   minSilenceDurationMs: number;
   segments: SmartRingtoneSegment[];
   activeSegmentId: number | null;
+  isSegmentPlaying: boolean;
   onOptimize: () => Promise<void>;
   onToggleManualTrim: (enabled: boolean) => void;
   onTrimStartChange: (value: number) => void;
@@ -31,6 +32,7 @@ export const SmartRingtoneSection = ({
   minSilenceDurationMs,
   segments,
   activeSegmentId,
+  isSegmentPlaying,
   onOptimize,
   onToggleManualTrim,
   onTrimStartChange,
@@ -129,21 +131,39 @@ export const SmartRingtoneSection = ({
                 {segments.length > 1 ? 's' : ''}
               </p>
               <div className="space-y-1 max-h-32 overflow-y-auto">
-                {segments.map((segment) => (
-                  <button
-                    key={segment.id}
-                    type="button"
-                    onClick={() => onPlaySegment(segment.id)}
-                    className={`w-full text-left px-2 py-1 rounded text-[11px] transition-colors ${
-                      activeSegmentId === segment.id
-                        ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                    }`}
-                  >
-                    Segment {segment.id}: {segment.startSeconds.toFixed(1)}s -{' '}
-                    {segment.endSeconds.toFixed(1)}s
-                  </button>
-                ))}
+                {segments.map((segment) => {
+                  const isActive = activeSegmentId === segment.id;
+                  const isPlaying = isActive && isSegmentPlaying;
+                  
+                  return (
+                    <button
+                      key={segment.id}
+                      type="button"
+                      onClick={() => onPlaySegment(segment.id)}
+                      className={`w-full text-left px-2 py-1 rounded text-[11px] transition-colors flex items-center gap-2 ${
+                        isActive
+                          ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100'
+                          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      <span className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
+                        {isPlaying ? (
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                        ) : (
+                          <svg className="w-3 h-3 ml-0.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </span>
+                      <span className="flex-1">
+                        Segment {segment.id}: {segment.startSeconds.toFixed(1)}s -{' '}
+                        {segment.endSeconds.toFixed(1)}s
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

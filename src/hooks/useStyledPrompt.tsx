@@ -14,6 +14,7 @@ interface PromptContentProps {
   closeToast?: () => void;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 const PromptContent = ({ message, defaultValue, onConfirm, onCancel, closeToast }: PromptContentProps) => {
   const [value, setValue] = useState(defaultValue);
   const inputRef = useRef<HTMLInputElement>(null);

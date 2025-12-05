@@ -95,14 +95,12 @@ export const useDashboard = () => {
     resetSmartRingtoneRef.current();
     setSmartSourceBlob(null);
     setSmartSourceRingtoneId(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trimRingtoneId]); // Ne dépendre que de trimRingtoneId, la fonction reset est stable (useCallback)
 
   // Réinitialiser l'égaliseur lorsqu'on change de sonnerie
   useEffect(() => {
     resetEqualizerRef.current();
     setEqualizerSourceBlob(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [equalizerRingtoneId]); // Ne dépendre que de equalizerRingtoneId, la fonction reset est stable (useCallback)
 
   // Handlers de navigation

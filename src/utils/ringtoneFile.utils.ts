@@ -2,6 +2,8 @@
  * Utilitaires pour la création et la manipulation de fichiers de sonneries
  */
 
+import { MAX_RINGTONE_DURATION_SECONDS, MIN_RINGTONE_DURATION_SECONDS } from './ringtoneConstants';
+
 /**
  * Télécharge un blob depuis une URL
  * @param url - L'URL à télécharger
@@ -31,14 +33,14 @@ export function sanitizeTitle(title: string): string {
 /**
  * Clampe une durée entre les limites autorisées pour une sonnerie
  * @param duration - La durée en secondes
- * @param min - Durée minimale (défaut: 1)
- * @param max - Durée maximale (défaut: 40)
+ * @param min - Durée minimale (défaut: MIN_RINGTONE_DURATION_SECONDS)
+ * @param max - Durée maximale (défaut: MAX_RINGTONE_DURATION_SECONDS)
  * @returns La durée clamptée et arrondie
  */
 export function clampRingtoneDuration(
   duration: number,
-  min: number = 1,
-  max: number = 40,
+  min: number = MIN_RINGTONE_DURATION_SECONDS,
+  max: number = MAX_RINGTONE_DURATION_SECONDS,
 ): number {
   if (!Number.isFinite(duration) || duration < min) {
     return min;

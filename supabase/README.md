@@ -19,6 +19,8 @@
    - File size limit : 10MB
    - Allowed MIME types : `audio/*`
 4. Exécuter `002_create_storage_bucket.sql`
+5. Exécuter `003_add_is_protected_column.sql` (si pas déjà fait)
+6. **Exécuter `004_update_duration_constraint.sql`** pour augmenter la limite de durée à 120 secondes
 
 ### 3. Configurer les variables d'environnement
 

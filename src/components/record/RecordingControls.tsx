@@ -9,9 +9,11 @@ interface RecordingControlsProps {
   duration: number;
   title: string;
   gain: number;
+  maxDuration: number;
   recordingMode: RecordingMode;
   onTitleChange: (title: string) => void;
   onGainChange: (gain: number) => void;
+  onMaxDurationChange: (maxDuration: number) => void;
   onRecordingModeChange: (mode: RecordingMode) => void;
   onStart: () => Promise<void>;
   onStop: () => void;
@@ -25,9 +27,11 @@ export const RecordingControls = ({
   duration,
   title,
   gain,
+  maxDuration,
   recordingMode,
   onTitleChange,
   onGainChange,
+  onMaxDurationChange,
   onRecordingModeChange,
   onStart,
   onStop,
@@ -161,6 +165,41 @@ export const RecordingControls = ({
         </div>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
           💡 Augmente le volume d'enregistrement. Au-delà de 3.0x, risque de distorsion.
+        </p>
+      </div>
+
+      {/* Contrôle de la durée maximum */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <span>Durée maximum d'enregistrement</span>
+          <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
+            {maxDuration}s{' '}
+            {maxDuration <= 20
+              ? '(Court)'
+              : maxDuration <= 40
+                ? '(Recommandé)'
+                : maxDuration <= 60
+                  ? '(Long)'
+                  : '(Très long)'}
+          </span>
+        </label>
+        <input
+          type="range"
+          min="5"
+          max="120"
+          step="5"
+          value={maxDuration}
+          onChange={(e) => onMaxDurationChange(parseInt(e.target.value, 10))}
+          disabled={isRecording}
+          className="range-default"
+        />
+        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+          <span>5s</span>
+          <span>40s (Recommandé)</span>
+          <span>120s</span>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          ⏱️ Durée maximum pour l'enregistrement et l'optimisation. Les sonneries sont généralement entre 5 et 40 secondes.
         </p>
       </div>
     </div>
