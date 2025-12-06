@@ -27,7 +27,7 @@ describe('useCapacitor', () => {
     vi.clearAllMocks();
     vi.mocked(App.addListener).mockResolvedValue({
       remove: vi.fn(),
-    } as any);
+    } as { remove: () => Promise<void> });
   });
 
   it('devrait retourner les valeurs correctes pour le web', () => {
