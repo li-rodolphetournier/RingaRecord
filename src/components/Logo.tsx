@@ -1,4 +1,5 @@
-import { memo, useState } from 'react';
+import { memo } from 'react';
+// import { memo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
@@ -17,13 +18,13 @@ export const Logo = memo(({
   className = '', 
   onClick, 
   showLink = true,
-  height = 'h-10'
+  // height = 'h-10'
 }: LogoProps) => {
-  const [hasError, setHasError] = useState(false);
-  const [imgLoaded, setImgLoaded] = useState(false);
+  // const [hasError, setHasError] = useState(false);
+  // const [imgLoaded, setImgLoaded] = useState(false);
   
   // Le logo doit être placé dans le dossier public/
-  const logoSrc = '/logo.png';
+  // const logoSrc = '/logo.png';
 
   const logoContent = (
     <motion.div
@@ -36,7 +37,7 @@ export const Logo = memo(({
       whileTap={{ scale: 0.95 }}
       onClick={onClick}
     >
-      {!hasError && (
+      {/* {!hasError && (
         <img
           src={logoSrc}
           alt=""
@@ -52,7 +53,7 @@ export const Logo = memo(({
             setHasError(true);
           }}
         />
-      )}
+      )} */}
       <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">
         RingaRecord
       </span>

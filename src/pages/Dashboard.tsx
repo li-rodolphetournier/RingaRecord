@@ -9,7 +9,7 @@ import { RingtoneCard } from '../components/ringtones/RingtoneCard';
 import type { RingtoneFormat } from '../services/audio/ringtoneConverter.service';
 import { useDashboard } from '../hooks/useDashboard';
 import { ThemeToggle } from '../components/ThemeToggle';
-import { Logo } from '../components/Logo';
+// import { Logo } from '../components/Logo';
 import { containerVariants, itemVariants, headerVariants } from '../utils/animations';
 
 export const Dashboard = () => {
@@ -129,7 +129,7 @@ export const Dashboard = () => {
         animate="visible"
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <Logo height="h-10" />
+          {/* <Logo height="h-10" /> */}
           <div className="flex items-center gap-3">
             <ThemeToggle />
             <Button onClick={() => navigate('/record')} variant="primary">
