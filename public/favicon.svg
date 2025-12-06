@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" aria-hidden="true">
+  <defs>
+    <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2C5F8C" />
+      <stop offset="50%" stop-color="#4A7BA7" />
+      <stop offset="100%" stop-color="#E76F51" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Fond circulaire avec gradient -->
+  <circle cx="32" cy="32" r="28" fill="url(#ringGradient)" stroke="none" />
+  
+  <!-- Cercle intérieur pour créer l'anneau -->
+  <circle cx="32" cy="32" r="18" fill="none" stroke="white" stroke-width="1" opacity="0.3" />
+  
+  <!-- Éléments musicaux simplifiés -->
+  <!-- Note de musique stylisée -->
+  <path d="M 24 20 L 24 28 L 28 28 L 28 24 L 32 24 L 32 36 L 24 36 L 24 40 L 36 40 L 36 20 Z" 
+        fill="white" opacity="0.8" />
+  
+  <!-- Barres d'onde sonore simplifiées -->
+  <rect x="40" y="24" width="2" height="8" fill="white" opacity="0.6" />
+  <rect x="44" y="22" width="2" height="12" fill="white" opacity="0.7" />
+  <rect x="48" y="26" width="2" height="6" fill="white" opacity="0.5" />
+</svg>
+

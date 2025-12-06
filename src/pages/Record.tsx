@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -9,9 +9,11 @@ import { PreviewSection } from '../components/record/PreviewSection';
 import { BPMSection } from '../components/record/BPMSection';
 import { SaveSection } from '../components/record/SaveSection';
 import { Equalizer } from '../components/audio/Equalizer';
+import { YouTubePlayer } from '../components/youtube/YouTubePlayer';
 import { useRecordPage } from '../hooks/useRecordPage';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { scrollRevealVariants } from '../utils/animations';
+import type { YouTubeVideoInfo } from '../services/youtube/youtube.service';
 
 /**
  * Page d'enregistrement de sonneries
@@ -20,6 +22,9 @@ import { scrollRevealVariants } from '../utils/animations';
  */
 export const Record = () => {
   const navigate = useNavigate();
+  const [showYouTubePlayer, setShowYouTubePlayer] = useState(false);
+  const [youtubeVideoInfo, setYoutubeVideoInfo] = useState<YouTubeVideoInfo | null>(null);
+  
   const {
     // États
     title,
@@ -122,6 +127,39 @@ export const Record = () => {
             </motion.h1>
 
           <div className="space-y-6">
+            {/* Section YouTube (optionnelle) */}
+            <div className="border-b border-gray-200 dark:border-gray-700 pb-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  📺 Enregistrer depuis YouTube
+                </h2>
+                <Button
+                  onClick={() => setShowYouTubePlayer(!showYouTubePlayer)}
+                  variant="secondary"
+                  className="min-h-[44px]"
+                >
+                  {showYouTubePlayer ? 'Masquer' : 'Afficher'}
+                </Button>
+              </div>
+              {showYouTubePlayer && (
+                <YouTubePlayer
+                  onVideoLoaded={(info) => {
+                    setYoutubeVideoInfo(info);
+                    // Suggérer automatiquement le mode "Son système" si une vidéo est chargée
+                    if (info.isValid && recordingMode !== 'system') {
+                      // Note: On ne force pas le changement, on suggère seulement
+                      console.log('Vidéo YouTube chargée. Utilisez le mode "Son système" pour enregistrer.');
+                    }
+                  }}
+                />
+              )}
+              {youtubeVideoInfo?.isValid && !showYouTubePlayer && (
+                <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                  ✅ Vidéo YouTube chargée : {youtubeVideoInfo.videoId}
+                </div>
+              )}
+            </div>
+
             {/* Contrôles d'enregistrement */}
             <RecordingControls
               isRecording={audioRecorder.isRecording}
