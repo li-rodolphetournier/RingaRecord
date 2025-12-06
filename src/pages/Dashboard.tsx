@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { toast } from 'react-toastify';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -8,6 +9,8 @@ import { RingtoneCard } from '../components/ringtones/RingtoneCard';
 import type { RingtoneFormat } from '../services/audio/ringtoneConverter.service';
 import { useDashboard } from '../hooks/useDashboard';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { Logo } from '../components/Logo';
+import { containerVariants, itemVariants, headerVariants } from '../utils/animations';
 
 export const Dashboard = () => {
   const {
@@ -119,9 +122,14 @@ export const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <header className="bg-white dark:bg-gray-800 shadow-sm">
+      <motion.header
+        className="bg-white dark:bg-gray-800 shadow-sm"
+        variants={headerVariants}
+        initial="hidden"
+        animate="visible"
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">RingaRecord</h1>
+          <Logo height="h-10" />
           <div className="flex items-center gap-3">
             <ThemeToggle />
             <Button onClick={() => navigate('/record')} variant="primary">
@@ -132,10 +140,15 @@ export const Dashboard = () => {
             </Button>
           </div>
         </div>
-      </header>
+      </motion.header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-between mb-6">
+        <motion.div
+          className="flex items-center justify-between mb-6"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.1 }}
+        >
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Mes sonneries</h2>
           <div className="flex items-center gap-3">
             <Button
@@ -204,7 +217,7 @@ export const Dashboard = () => {
               )}
             </button>
           </div>
-        </div>
+        </motion.div>
 
         {isLoading ? (
           <div className="flex items-center justify-center py-16 text-gray-600 dark:text-gray-400">
@@ -220,12 +233,15 @@ export const Dashboard = () => {
             </div>
           </Card>
         ) : (
-          <div
+          <motion.div
             className={
               viewMode === 'block'
                 ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'
                 : 'flex flex-col gap-4'
             }
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
           >
             {ringtones
               .filter((ringtone) => (showDashboardRingtones ? true : !isFavorite(ringtone.id)))
@@ -235,9 +251,9 @@ export const Dashboard = () => {
                 const isEqualizerOpen = equalizerRingtoneId === ringtone.id;
 
                 return (
-                  <RingtoneCard
-                    key={ringtone.id}
-                    ringtone={ringtone}
+                  <motion.div key={ringtone.id} variants={itemVariants} layout>
+                    <RingtoneCard
+                      ringtone={ringtone}
                     viewMode={viewMode}
                     isFavorite={isFavorite(ringtone.id)}
                     editing={{
@@ -305,9 +321,10 @@ export const Dashboard = () => {
                       onDelete: () => handleDeleteClick(ringtone),
                     }}
                   />
+                  </motion.div>
                 );
               })}
-          </div>
+          </motion.div>
         )}
       </main>
       {shareRingtone && (

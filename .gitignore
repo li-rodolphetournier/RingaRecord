@@ -38,3 +38,8 @@ docs/
 # Supabase generated artifacts (handled outside repo)
 supabase/migrations/
 supabase/.temp/
+
+# Capacitor
+/android
+/ios
+.capacitor

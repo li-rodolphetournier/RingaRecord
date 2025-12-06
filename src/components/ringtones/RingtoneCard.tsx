@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 import type { Ringtone } from '../../types/ringtone.types';
 import type { SmartRingtoneSegment } from '../../services/audio/smartRingtone.service';
 import type { EqualizerPreset, SpectralAnalysisResult } from '../../types/equalizer.types';
@@ -9,6 +10,7 @@ import { RingtoneActions } from './RingtoneActions';
 import { TrimControls } from './TrimControls';
 import { ExistingSmartAssistant } from './ExistingSmartAssistant';
 import { EqualizerSection } from './EqualizerSection';
+import { cardVariants } from '../../utils/animations';
 
 /**
  * Props pour la section Trim
@@ -107,11 +109,18 @@ export const RingtoneCard = ({
   actions,
 }: RingtoneCardProps) => {
   return (
-    <Card
-      className={`hover:shadow-lg transition-shadow overflow-visible ${
-        viewMode === 'landscape' ? 'flex flex-row gap-4 p-4' : ''
-      }`}
+    <motion.div
+      variants={cardVariants}
+      initial="hidden"
+      animate="show"
+      whileHover="hover"
+      layout
     >
+      <Card
+        className={`hover:shadow-lg transition-shadow overflow-visible ${
+          viewMode === 'landscape' ? 'flex flex-row gap-4 p-4' : ''
+        }`}
+      >
       {viewMode === 'landscape' ? (
         <>
           {/* Mode paysage : Player à gauche, infos à droite */}
@@ -135,7 +144,9 @@ export const RingtoneCard = ({
                 viewMode="landscape"
               />
             </div>
-            <RingtoneMeta ringtone={ringtone} />
+            <div className="mb-4">
+              <RingtoneMeta ringtone={ringtone} />
+            </div>
             <div className="mt-4 flex flex-col gap-2">
               <RingtoneActions
                 ringtone={ringtone}
@@ -222,7 +233,9 @@ export const RingtoneCard = ({
               </button>
             )}
           </div>
-          <RingtoneMeta ringtone={ringtone} />
+          <div className="mb-4">
+            <RingtoneMeta ringtone={ringtone} />
+          </div>
 
           {/* Player audio */}
           <div className="mb-4">
@@ -287,7 +300,8 @@ export const RingtoneCard = ({
           </div>
         </>
       )}
-    </Card>
+      </Card>
+    </motion.div>
   );
 };
 

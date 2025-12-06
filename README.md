@@ -57,7 +57,7 @@ src/
 ├── stores/                     # Zustand stores (auth, ringtones, theme)
 ├── pages/                      # Login / Register / Dashboard / Record / Favorites
 ├── types/                      # Types partagés (ringtone, equalizer, bpm)
-├── utils/                      # Utilitaires (ringtoneConstants, ringtoneFile.utils)
+├── utils/                      # Utilitaires (ringtoneConstants, ringtoneFile.utils, animations)
 └── test/                       # Setup Vitest
 
 supabase/
@@ -174,6 +174,7 @@ Pour chaque carte de sonnerie :
 | `npm run build` | Compile TypeScript + bundle Vite (production) |
 | `npm run preview` | Prévisualise le build de production |
 | `npm run lint`  | ESLint (config strict TypeScript) |
+| `npm run lint:check` | ESLint avec erreur si warnings (pour CI) |
 | `npm run test`  | Lance les tests Vitest (mode watch) |
 | `npm run test:run` | Exécute les tests une fois |
 | `npm run test:ui` | Interface UI Vitest |
@@ -191,6 +192,7 @@ Pour chaque carte de sonnerie :
 - ✅ `spectralAnalysis.service.test.ts` - Tests d'analyse spectrale
 - ✅ `themeStore.test.ts` - Tests du store de thème (dark mode)
 - ✅ `Switch.test.tsx` - Tests du composant Switch réutilisable
+- ✅ `animations.test.ts` - Tests des variantes d'animation Framer Motion
 
 ## 🔐 Sécurité
 
@@ -263,6 +265,15 @@ Pour chaque carte de sonnerie :
   - **Mobile-friendly** : Taille minimale 44x44px pour le touch
   - **Configuration Tailwind** : `darkMode: 'class'` pour activation via classe `.dark` sur `<html>`
 
+- ✅ **🎬 Animations avec Framer Motion**
+  - **Transitions de page fluides** : Fade + slide horizontal lors de la navigation
+  - **Animations stagger** : Les cartes de sonneries apparaissent avec un effet en cascade
+  - **Hover effects** : Animations au survol des cartes et boutons
+  - **Boutons interactifs** : Scale animations sur hover et tap
+  - **Variantes réutilisables** : Système centralisé d'animations dans `animations.ts`
+  - **Performance optimisée** : Utilisation de spring physics pour des animations naturelles
+  - **Accessibilité** : Respect des préférences de réduction de mouvement (à venir)
+
 ### En développement
 
 - 🔄 **Synchronisation Rythmique et Création de Boucles Parfaites**
@@ -303,6 +314,14 @@ Consulte `GOOGLE_PLAY_SETUP.md` pour la configuration TWA / PWA et la publicatio
 ### ✅ Architecture et Structure
 
 **Toutes les refactorisations majeures sont terminées !** Le codebase suit maintenant les meilleures pratiques React :
+
+#### Animations et UX
+- ✅ **Framer Motion intégré** : Bibliothèque d'animations pour transitions fluides
+- ✅ **Variantes centralisées** : Système d'animations réutilisables dans `animations.ts`
+- ✅ **Transitions de page** : Fade + slide horizontal avec `AnimatePresence`
+- ✅ **Animations stagger** : Effet en cascade pour les listes de cartes
+- ✅ **Hover effects** : Animations au survol pour meilleure interactivité
+- ✅ **Boutons animés** : Scale animations sur hover/tap avec spring physics
 
 #### Centralisation des Constantes
 - ✅ **`ringtoneConstants.ts`** : Constantes centralisées pour durée min/max

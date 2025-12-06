@@ -25,4 +25,10 @@ export default defineConfig({
     },
     chunkSizeWarningLimit: 800,
   },
+  // Configuration pour Capacitor
+  base: './', // Important pour Capacitor
+  server: {
+    host: '0.0.0.0', // Permet l'accès depuis l'émulateur Android
+    port: 5173,
+  },
 });

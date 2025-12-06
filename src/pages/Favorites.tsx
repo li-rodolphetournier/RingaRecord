@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { RingtoneDetailsModal } from '../components/RingtoneDetailsModal';
@@ -6,6 +7,7 @@ import { FavoritesRootList } from '../components/favorites/FavoritesRootList';
 import { FavoritesFoldersPanel } from '../components/favorites/FavoritesFoldersPanel';
 import { useFavorites } from '../hooks/useFavorites';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { headerVariants } from '../utils/animations';
 
 export const Favorites = () => {
   const {
@@ -30,7 +32,12 @@ export const Favorites = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <header className="border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm sticky top-0 z-20">
+      <motion.header
+        className="border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm sticky top-0 z-20"
+        variants={headerVariants}
+        initial="hidden"
+        animate="visible"
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Button
@@ -53,7 +60,7 @@ export const Favorites = () => {
           </div>
           <ThemeToggle />
         </div>
-      </header>
+      </motion.header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">

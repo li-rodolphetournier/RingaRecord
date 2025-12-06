@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
+import { motion } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { useErrorHandler } from '../hooks/useErrorHandler';
@@ -7,6 +8,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Card } from '../components/ui/Card';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { scrollRevealVariants } from '../utils/animations';
 
 export const Login = () => {
   const navigate = useNavigate();
@@ -36,13 +38,29 @@ export const Login = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4">
-      <div className="absolute top-4 right-4">
+      <motion.div
+        className="absolute top-4 right-4"
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.3 }}
+      >
         <ThemeToggle />
-      </div>
-      <Card className="w-full max-w-md">
-        <h1 className="text-2xl font-bold mb-6 text-center text-gray-900 dark:text-gray-100">
-          Connexion
-        </h1>
+      </motion.div>
+      <motion.div
+        variants={scrollRevealVariants}
+        initial="hidden"
+        animate="visible"
+        className="w-full max-w-md"
+      >
+        <Card className="w-full">
+          <motion.h1
+            className="text-2xl font-bold mb-6 text-center text-gray-900 dark:text-gray-100"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.1 }}
+          >
+            Connexion
+          </motion.h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
             type="email"
@@ -73,7 +91,8 @@ export const Login = () => {
             S'inscrire
           </Link>
         </p>
-      </Card>
+        </Card>
+      </motion.div>
     </div>
   );
 };

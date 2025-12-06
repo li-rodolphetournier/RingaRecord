@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useEffect, useMemo } from 'react';
+import { motion } from 'framer-motion';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { RecordingControls } from '../components/record/RecordingControls';
@@ -10,6 +11,7 @@ import { SaveSection } from '../components/record/SaveSection';
 import { Equalizer } from '../components/audio/Equalizer';
 import { useRecordPage } from '../hooks/useRecordPage';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { scrollRevealVariants } from '../utils/animations';
 
 /**
  * Page d'enregistrement de sonneries
@@ -92,17 +94,32 @@ export const Record = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 px-4 py-8">
       <div className="max-w-2xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
+        <motion.div
+          className="flex items-center justify-between mb-6"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
           <Button onClick={() => navigate('/dashboard')} variant="secondary">
             ← Retour
           </Button>
           <ThemeToggle />
-        </div>
+        </motion.div>
 
-        <Card>
-          <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">
-            Enregistrer une sonnerie
-          </h1>
+        <motion.div
+          variants={scrollRevealVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <Card>
+            <motion.h1
+              className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, delay: 0.1 }}
+            >
+              Enregistrer une sonnerie
+            </motion.h1>
 
           <div className="space-y-6">
             {/* Contrôles d'enregistrement */}
@@ -193,7 +210,8 @@ export const Record = () => {
             {/* Section de sauvegarde */}
             <SaveSection title={title} isUploading={isUploading} onSave={handleSave} />
           </div>
-        </Card>
+          </Card>
+        </motion.div>
       </div>
 
       {/* Élément audio caché pour la prévisualisation des segments */}

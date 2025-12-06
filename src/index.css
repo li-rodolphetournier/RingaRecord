@@ -78,6 +78,95 @@
   border: none;
 }
 
+/* Slider moderne pour AudioPlayer */
+.slider {
+  @apply w-full h-2 rounded-lg cursor-pointer appearance-none touch-manipulation;
+  background: linear-gradient(
+    to right,
+    #2563eb 0%,
+    #2563eb var(--slider-progress, 0%),
+    rgba(37, 99, 235, 0.25) var(--slider-progress, 0%),
+    rgba(37, 99, 235, 0.25) 100%
+  );
+}
+
+/* WebKit pour slider */
+.slider::-webkit-slider-runnable-track {
+  height: 0.5rem;
+  border-radius: 0.5rem;
+  background: transparent;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 1rem;
+  width: 1rem;
+  border-radius: 9999px;
+  background-color: #2563eb;
+  box-shadow: 0 0 0 2px white, 0 2px 4px rgba(0, 0, 0, 0.2);
+  border: none;
+  margin-top: -0.25rem;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.slider::-webkit-slider-thumb:active {
+  transform: scale(1.2);
+}
+
+/* Firefox pour slider */
+.slider::-moz-range-track {
+  height: 0.5rem;
+  border-radius: 0.5rem;
+  background: transparent;
+  border: none;
+}
+
+.slider::-moz-range-thumb {
+  height: 1rem;
+  width: 1rem;
+  border-radius: 9999px;
+  background-color: #2563eb;
+  box-shadow: 0 0 0 2px white, 0 2px 4px rgba(0, 0, 0, 0.2);
+  border: none;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.slider::-moz-range-thumb:hover {
+  transform: scale(1.1);
+}
+
+.slider::-moz-range-thumb:active {
+  transform: scale(1.2);
+}
+
+/* Dark mode pour slider */
+.dark .slider {
+  background: linear-gradient(
+    to right,
+    #3b82f6 0%,
+    #3b82f6 var(--slider-progress, 0%),
+    rgba(59, 130, 246, 0.25) var(--slider-progress, 0%),
+    rgba(59, 130, 246, 0.25) 100%
+  );
+}
+
+.dark .slider::-webkit-slider-thumb {
+  background-color: #3b82f6;
+  box-shadow: 0 0 0 2px #1f2937, 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.dark .slider::-moz-range-thumb {
+  background-color: #3b82f6;
+  box-shadow: 0 0 0 2px #1f2937, 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
 /* Styles pour les toasts de confirmation stylés */
 /* Utilisation de CSS Cascade Layers et sélecteurs spécifiques pour surcharger sans !important */
 
