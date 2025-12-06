@@ -1,7 +1,7 @@
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import type { RecordingMode } from '../../utils/browserSupport';
-import { getSystemAudioHelpMessage } from '../../utils/browserSupport';
+import { getSystemAudioHelpMessage, isRecordingModeSupported, getBrowserSupport } from '../../utils/browserSupport';
 
 interface RecordingControlsProps {
   isRecording: boolean;
@@ -44,6 +44,9 @@ export const RecordingControls = ({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const browserSupport = getBrowserSupport();
+  const systemAudioSupported = isRecordingModeSupported('system');
+
   return (
     <div className="space-y-4">
       {/* Titre */}
@@ -82,20 +85,40 @@ export const RecordingControls = ({
           <button
             type="button"
             onClick={() => onRecordingModeChange('system')}
-            disabled={isRecording}
+            disabled={isRecording || !systemAudioSupported}
+            title={!systemAudioSupported ? getSystemAudioHelpMessage() : undefined}
             className={`flex-1 px-4 py-2 rounded-lg border transition-colors min-h-[44px] ${
-              recordingMode === 'system'
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+              !systemAudioSupported
+                ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 border-gray-300 dark:border-gray-600 cursor-not-allowed opacity-50'
+                : recordingMode === 'system'
+                  ? 'bg-blue-600 text-white border-blue-600'
+                  : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
             }`}
           >
             🔊 Son système
+            {!systemAudioSupported && browserSupport.isNative && (
+              <span className="block text-xs mt-1">(Non disponible)</span>
+            )}
           </button>
         </div>
         {recordingMode === 'system' && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            {getSystemAudioHelpMessage()}
-          </p>
+          <div className="mt-2 space-y-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {getSystemAudioHelpMessage()}
+            </p>
+            {!systemAudioSupported && browserSupport.isNative && (
+              <div className="text-xs bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded p-2 mt-2">
+                <p className="font-semibold text-yellow-800 dark:text-yellow-200 mb-1">
+                  💡 Alternatives sur mobile :
+                </p>
+                <ul className="list-disc list-inside text-yellow-700 dark:text-yellow-300 space-y-1">
+                  <li>Utilisez le mode microphone</li>
+                  <li>Ouvrez l'app dans Chrome Android pour capturer les onglets</li>
+                  <li>Utilisez la version web sur desktop pour le son système complet</li>
+                </ul>
+              </div>
+            )}
+          </div>
         )}
       </div>
 

@@ -10,6 +10,7 @@ export interface BrowserSupport {
   isMobile: boolean;
   isIOS: boolean;
   isAndroid: boolean;
+  isNative: boolean; // Capacitor natif
   browserName: string;
 }
 
@@ -77,15 +78,42 @@ const detectMicrophoneSupport = (): boolean => {
 };
 
 /**
+ * Détecte si on est dans une application Capacitor native
+ */
+const detectCapacitorNative = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  
+  // Capacitor expose un objet Capacitor sur window
+  const capacitor = (window as Window & { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor;
+  if (capacitor && capacitor.isNativePlatform && capacitor.isNativePlatform()) {
+    return true;
+  }
+  
+  // Vérification alternative : user agent ou présence de plugins Capacitor
+  const userAgent = navigator.userAgent || '';
+  if (userAgent.includes('CapacitorHttp')) {
+    return true;
+  }
+  
+  return false;
+};
+
+/**
  * Détecte le support de la capture audio système (getDisplayMedia)
  * 
  * Note: Sur mobile (iOS/Android), le support est très limité:
  * - iOS Safari: Pas de support natif
  * - Android Chrome: Support partiel (nécessite Chrome 74+)
  * - Desktop: Support variable selon navigateur
+ * - Capacitor natif: Pas de support (getDisplayMedia n'existe pas dans WebView)
  */
 const detectSystemAudioSupport = (): boolean => {
   if (typeof window === 'undefined') return false;
+  
+  // Sur mobile natif (Capacitor), getDisplayMedia n'existe pas
+  if (detectCapacitorNative()) {
+    return false; // Désactivé sur mobile natif
+  }
   
   // Vérifier si getDisplayMedia existe
   const hasGetDisplayMedia = !!(
@@ -102,11 +130,19 @@ const detectSystemAudioSupport = (): boolean => {
     return false; // Désactivé par défaut sur iOS
   }
   
-  // Sur Android, support partiel (Chrome 74+)
-  if (detectAndroid()) {
-    // Chrome Android peut supporter getDisplayMedia, mais avec limitations
+  // Sur Android, support partiel (Chrome 74+) - UNIQUEMENT dans navigateur, pas Capacitor
+  if (detectAndroid() && !detectCapacitorNative()) {
+    // Chrome Android dans navigateur peut supporter getDisplayMedia pour les onglets
+    // Mais PAS pour les applications natives
     const browser = detectBrowser();
+    // Note: Même dans Chrome Android, ne fonctionne que pour les onglets du navigateur
+    // Pas pour les applications natives comme YouTube app
     return browser === 'Chrome' || browser === 'Edge';
+  }
+  
+  // Sur Android natif (Capacitor), pas de support
+  if (detectAndroid() && detectCapacitorNative()) {
+    return false;
   }
   
   // Desktop: support généralement bon sur Chrome, Firefox, Edge
@@ -120,6 +156,7 @@ export const getBrowserSupport = (): BrowserSupport => {
   const isMobile = detectMobile();
   const isIOS = detectIOS();
   const isAndroid = detectAndroid();
+  const isNative = detectCapacitorNative();
   
   return {
     microphone: detectMicrophoneSupport(),
@@ -127,6 +164,7 @@ export const getBrowserSupport = (): BrowserSupport => {
     isMobile,
     isIOS,
     isAndroid,
+    isNative,
     browserName: detectBrowser(),
   };
 };
@@ -153,6 +191,11 @@ export const isRecordingModeSupported = (mode: RecordingMode): boolean => {
  */
 export const getSystemAudioHelpMessage = (): string => {
   const support = getBrowserSupport();
+  
+  // Message pour mobile natif (Capacitor)
+  if (support.isNative) {
+    return '⚠️ La capture audio système n\'est pas disponible sur les applications mobiles natives (Android/iOS). Utilisez le mode microphone pour enregistrer.';
+  }
   
   if (support.isIOS) {
     return '⚠️ La capture audio système n\'est pas disponible sur iOS Safari. Utilisez le mode microphone.';

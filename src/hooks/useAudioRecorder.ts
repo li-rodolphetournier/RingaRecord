@@ -108,6 +108,30 @@ export const useAudioRecorder = (options: UseAudioRecorderOptions = {}): UseAudi
       // Choisir la méthode de capture selon le mode
       if (currentMode === 'system') {
         // Capture audio système (getDisplayMedia)
+        // Vérifier si getDisplayMedia est disponible
+        if (!navigator.mediaDevices?.getDisplayMedia) {
+          // Sur mobile natif (Capacitor), getDisplayMedia n'existe généralement pas
+          // Mais on peut essayer de donner un message d'erreur plus utile
+          const isNative = typeof (window as Window & { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor !== 'undefined' &&
+            (window as Window & { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.();
+          
+          if (isNative) {
+            throw new Error(
+              '⚠️ La capture audio système n\'est pas disponible dans l\'application native mobile.\n\n' +
+              '💡 SOLUTIONS :\n\n' +
+              '1. Utilisez le mode microphone pour enregistrer\n' +
+              '2. Ouvrez l\'application dans Chrome Android (pas l\'app native) pour capturer les onglets\n' +
+              '3. Utilisez la version web sur desktop pour capturer le son système complet\n\n' +
+              'Note : Les applications natives (YouTube app, Spotify app, etc.) ne peuvent pas être capturées sur mobile.'
+            );
+          }
+          
+          throw new Error(
+            'Votre navigateur ne supporte pas la capture audio système. ' +
+            'Utilisez Chrome, Firefox ou Edge sur desktop, ou le mode microphone sur mobile.'
+          );
+        }
+        
         // Note: Certains navigateurs nécessitent video: true même si on veut juste l'audio
         try {
           // Permettre la sélection d'onglet, fenêtre ou écran entier
