@@ -43,3 +43,9 @@ supabase/.temp/
 /android
 /ios
 .capacitor
+
+# Android Keystore (NE JAMAIS COMMITER)
+*.jks
+*.keystore
+android/keystore.properties
+android/app/google-services.json
